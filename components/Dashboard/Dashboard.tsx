@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Filter, Star, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Grid3X3, List } from 'lucide-react';
+import { Filter, Star, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, TrendingDown, Grid3X3, List } from 'lucide-react';
 import axios from 'axios';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import Link from 'next/link';
 
 // Register GSAP plugins
 if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
+  gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 }
 
 // Types
@@ -276,7 +277,7 @@ const CoinCard = ({ coin, watchlist, toggleWatchlist }: {
   );
 };
 
-// List Item Component
+// Updated List Item Component
 const ListItem = ({ coin, watchlist, toggleWatchlist }: {
   coin: Coin;
   watchlist: WatchlistItem[];
@@ -344,50 +345,82 @@ const ListItem = ({ coin, watchlist, toggleWatchlist }: {
     <Link href={`/coin/${coin.id}`}>
       <div
         ref={listRef}
-        className="bg-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-800/50 p-4 hover:border-gray-700/80 transition-all duration-300 relative overflow-hidden cursor-pointer"
+        className="bg-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-800/50 p-6 hover:border-gray-700/80 transition-all duration-300 relative overflow-hidden cursor-pointer mb-4"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-gray-500/5 to-cyan-500/5 rounded-xl opacity-0 hover:opacity-100 transition-opacity duration-500" />
 
         <div className="relative z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="text-gray-400 font-medium text-sm w-8">
+            {/* Left Section - Rank, Image, and Name */}
+            <div className="flex items-center space-x-6">
+              <div className="text-gray-400 font-bold text-sm w-10 text-center">
                 #{coin.market_cap_rank || 'N/A'}
               </div>
-              <SimpleImage
-                src={coin.image}
-                alt={coin.name}
-                className="h-8 w-8 rounded-full ring-2 ring-gray-700/50"
-              />
-              <div>
-                <div className="font-semibold text-white">{coin.name}</div>
-                <div className="text-gray-400 text-sm uppercase tracking-wider">{coin.symbol}</div>
+              <div className="flex items-center space-x-4">
+                <SimpleImage
+                  src={coin.image}
+                  alt={coin.name}
+                  className="h-10 w-10 rounded-full ring-2 ring-gray-700/50"
+                />
+                <div className="min-w-0">
+                  <div className="font-bold text-white text-lg truncate">
+                    {coin.name}
+                  </div>
+                  <div className="text-gray-400 text-sm uppercase tracking-wider font-medium">
+                    {coin.symbol}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-6">
-              <div className="text-right">
-                <div className="font-semibold text-white">
+            {/* Right Section - Price, Change, Market Data, and Watchlist */}
+            <div className="flex items-center space-x-8">
+              {/* Price and Change */}
+              <div className="text-right min-w-[120px]">
+                <div className="font-bold text-white text-lg">
                   {formatPrice(coin.current_price)}
                 </div>
-                <div className={`flex items-center justify-end space-x-1 text-sm ${coin.price_change_percentage_24h >= 0
-                  ? 'text-green-400'
-                  : 'text-red-400'
-                  }`}>
+                <div className={`flex items-center justify-end space-x-1 text-sm font-semibold ${
+                  coin.price_change_percentage_24h >= 0
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                }`}>
                   {coin.price_change_percentage_24h >= 0 ? (
-                    <TrendingUp className="h-3 w-3" />
+                    <TrendingUp className="h-4 w-4" />
                   ) : (
-                    <TrendingDown className="h-3 w-3" />
+                    <TrendingDown className="h-4 w-4" />
                   )}
                   <span>{formatPercentage(coin.price_change_percentage_24h)}</span>
                 </div>
               </div>
 
-              <div className="text-right text-sm text-gray-400 hidden sm:block">
-                <div>Cap: {formatMarketCap(coin.market_cap)}</div>
-                <div>Vol: {formatVolume(coin.total_volume)}</div>
+              {/* Market Data - Hidden on small screens */}
+              <div className="text-right text-sm text-gray-400 hidden lg:block min-w-[140px]">
+                <div className="mb-1">
+                  <span className="text-gray-500">Market Cap: </span>
+                  <span className="text-gray-300 font-bold">
+                    {formatMarketCap(coin.market_cap)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Volume: </span>
+                  <span className="text-gray-300 font-bold">
+                    {formatVolume(coin.total_volume)}
+                  </span>
+                </div>
               </div>
 
+              {/* Additional Market Data for medium screens */}
+              <div className="text-right text-sm text-gray-400 hidden md:block lg:hidden min-w-[100px]">
+                <div className="font-bold text-gray-300">
+                  {formatMarketCap(coin.market_cap)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Market Cap
+                </div>
+              </div>
+
+              {/* Watchlist Button */}
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -405,16 +438,36 @@ const ListItem = ({ coin, watchlist, toggleWatchlist }: {
                     image: coin.image
                   });
                 }}
-                className={`p-2 rounded-full transition-all duration-300 ${isInWatchlist(coin.id)
-                  ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-400/10'
-                  : 'text-gray-500 hover:text-yellow-400 hover:bg-yellow-400/10'
-                  }`}
+                className={`p-3 rounded-full transition-all duration-300 min-w-[44px] ${
+                  isInWatchlist(coin.id)
+                    ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-400/10 ring-1 ring-yellow-400/20'
+                    : 'text-gray-500 hover:text-yellow-400 hover:bg-yellow-400/10 hover:ring-1 hover:ring-yellow-400/20'
+                }`}
               >
                 <Star
-                  className={`h-5 w-5 ${isInWatchlist(coin.id) ? 'fill-current' : ''
-                    }`}
+                  className={`h-5 w-5 ${
+                    isInWatchlist(coin.id) ? 'fill-current' : ''
+                  }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* Mobile Market Data - Shown only on small screens */}
+          <div className="mt-4 pt-4 border-t border-gray-800/50 block md:hidden">
+            <div className="flex justify-between text-sm">
+              <div>
+                <span className="text-gray-500">Market Cap: </span>
+                <span className="text-gray-300 font-bold">
+                  {formatMarketCap(coin.market_cap)}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Volume: </span>
+                <span className="text-gray-300 font-bold">
+                  {formatVolume(coin.total_volume)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -423,7 +476,7 @@ const ListItem = ({ coin, watchlist, toggleWatchlist }: {
   );
 };
 
-// Utility functions (keeping the same as before)
+// Utility functions
 const formatPrice = (price: number): string => {
   if (!price && price !== 0) return 'N/A';
   return new Intl.NumberFormat('en-US', {
@@ -457,7 +510,7 @@ const formatPercentage = (percentage: number): string => {
   return `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
 };
 
-// Loading Skeleton Components (keeping the same)
+// Loading Skeleton Components
 const GridLoadingSkeleton = () => {
   const skeletonRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -580,7 +633,6 @@ const GridView = ({ coins, watchlist, toggleWatchlist }: {
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Refresh ScrollTrigger when coins change
     ScrollTrigger.refresh();
   }, [coins]);
 
@@ -588,7 +640,7 @@ const GridView = ({ coins, watchlist, toggleWatchlist }: {
     <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {coins.map((coin, index) => (
         <CoinCard
-          key={`${coin.id}-${index}`} // Unique key to force re-render
+          key={`${coin.id}-${index}`}
           coin={coin}
           watchlist={watchlist}
           toggleWatchlist={toggleWatchlist}
@@ -606,7 +658,6 @@ const ListView = ({ coins, watchlist, toggleWatchlist }: {
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Refresh ScrollTrigger when coins change
     ScrollTrigger.refresh();
   }, [coins]);
 
@@ -614,7 +665,7 @@ const ListView = ({ coins, watchlist, toggleWatchlist }: {
     <div ref={listRef} className="space-y-4">
       {coins.map((coin, index) => (
         <ListItem
-          key={`${coin.id}-${index}`} // Unique key to force re-render
+          key={`${coin.id}-${index}`}
           coin={coin}
           watchlist={watchlist}
           toggleWatchlist={toggleWatchlist}
@@ -685,7 +736,6 @@ export default function Markets() {
   // Refresh ScrollTrigger when data changes
   useEffect(() => {
     if (!loading && coins.length > 0) {
-      // Small delay to ensure DOM is updated
       setTimeout(() => {
         ScrollTrigger.refresh();
       }, 100);
@@ -823,8 +873,6 @@ export default function Markets() {
 
   return (
     <div className="min-h-screen bg-black text-white font-roboto">
-
-
       <div
         className="absolute inset-0 z-0"
         style={{
@@ -844,9 +892,9 @@ export default function Markets() {
             </p>
           </div>
 
-          {/* Filters Section */}
+          {/* Updated Filters Section */}
           <div ref={filtersRef} className="mb-8">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+            <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
               <div className="flex flex-col sm:flex-row gap-4 flex-1">
                 <div className="relative">
                   <input
@@ -858,45 +906,60 @@ export default function Markets() {
                   />
                 </div>
 
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-3 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300"
-                >
-                  <option value="market_cap_desc">Market Cap (High to Low)</option>
-                  <option value="market_cap_asc">Market Cap (Low to High)</option>
-                  <option value="volume_desc">Volume (High to Low)</option>
-                  <option value="price_desc">Price (High to Low)</option>
-                  <option value="price_asc">Price (Low to High)</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full sm:w-auto pl-4 pr-10 py-3 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300 appearance-none cursor-pointer"
+                  >
+                    <option value="market_cap_desc">Market Cap (High to Low)</option>
+                    <option value="market_cap_asc">Market Cap (Low to High)</option>
+                    <option value="volume_desc">Volume (High to Low)</option>
+                    <option value="price_desc">Price (High to Low)</option>
+                    <option value="price_asc">Price (Low to High)</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-blue-400" />
-                  <span className="text-sm text-gray-300">Filters:</span>
+                  <span className="text-sm font-medium text-gray-300">Filters:</span>
                 </div>
 
-                <select
-                  value={priceFilter}
-                  onChange={(e) => setPriceFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300"
-                >
-                  <option value="all">All Prices</option>
-                  <option value="under-1">Under $1</option>
-                  <option value="1-100">$1 - $100</option>
-                  <option value="over-100">Over $100</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={priceFilter}
+                    onChange={(e) => setPriceFilter(e.target.value)}
+                    className="pl-3 pr-8 py-2.5 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300 appearance-none cursor-pointer min-w-[120px]"
+                  >
+                    <option value="all">All Prices</option>
+                    <option value="under-1">Under $1</option>
+                    <option value="1-100">$1 - $100</option>
+                    <option value="over-100">Over $100</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                  </div>
+                </div>
 
-                <select
-                  value={changeFilter}
-                  onChange={(e) => setChangeFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300"
-                >
-                  <option value="all">All Changes</option>
-                  <option value="positive">Gainers</option>
-                  <option value="negative">Losers</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={changeFilter}
+                    onChange={(e) => setChangeFilter(e.target.value)}
+                    className="pl-3 pr-8 py-2.5 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white transition-all duration-300 appearance-none cursor-pointer min-w-[120px]"
+                  >
+                    <option value="all">All Changes</option>
+                    <option value="positive">Gainers</option>
+                    <option value="negative">Losers</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -942,7 +1005,7 @@ export default function Markets() {
               </button>
             </div>
 
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 font-bold">
               Showing {filteredCoins.length} of {coins.length} results
             </div>
           </div>
@@ -968,10 +1031,8 @@ export default function Markets() {
               )}
 
               {/* Pagination */}
-              <div ref={paginationRef} className="flex flex-col sm:flex-row items-center justify-between mt-8 gap-4">
-                <div className="text-gray-400">
-                  Showing {filteredCoins.length} of {coins.length} results (Page {currentPage})
-                </div>
+              <div ref={paginationRef} className="flex flex-col sm:flex-row items-center justify-center mt-8 gap-4">
+               
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={(e) => {
@@ -982,6 +1043,12 @@ export default function Markets() {
                         repeat: 1
                       });
                       setCurrentPage(prev => Math.max(prev - 1, 1));
+                      // Smooth scroll to top
+                      gsap.to(window, {
+                        scrollTo: { y: 0 },
+                        duration: 1,
+                        ease: "power2.out"
+                      });
                     }}
                     disabled={currentPage === 1}
                     className="flex items-center space-x-1 px-4 py-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800/80 transition-all duration-300 text-white"
@@ -1001,6 +1068,12 @@ export default function Markets() {
                         repeat: 1
                       });
                       setCurrentPage(prev => prev + 1);
+                      // Smooth scroll to top
+                      gsap.to(window, {
+                        scrollTo: { y: 0 },
+                        duration: 1,
+                        ease: "power2.out"
+                      });
                     }}
                     className="flex items-center space-x-1 px-4 py-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-lg hover:bg-gray-800/80 transition-all duration-300 text-white"
                   >
