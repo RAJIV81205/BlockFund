@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono , Roboto } from "next/font/google";
+import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -23,8 +23,22 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "GeckoView",
+  title: "GeckoView - Crypto Watch",
   description: "Crypto Watch",
+  icons: {
+    icon: [
+      {
+        url: "/logo.png",
+        sizes: "any",
+      },
+      {
+        url: "/logo.png",
+        sizes: "32x32",
+        type: "image/png",
+      },
+    ],
+    
+  },
 };
 
 export default function RootLayout({
