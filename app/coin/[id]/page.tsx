@@ -1,8 +1,9 @@
 import React from 'react'
+import Coin from '@/components/coin/Coin'
 
 const page = () => {
   return (
-    <div>page</div>
+    <Coin />
   )
 }
 
