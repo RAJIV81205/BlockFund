@@ -988,7 +988,7 @@ export default function Compare() {
 
   if (error) {
     return (
-      <div className="min-h-screen pt-30 bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen pt-30 bg-black text-white flex items-center justify-center font-roboto">
         <div className="text-center">
           <div className="text-6xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold mb-4">Error</h1>
@@ -1006,7 +1006,7 @@ export default function Compare() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4 py-8 pt-30">
+      <div className="max-w-7xl mx-auto px-4 py-8 pt-30 font-roboto">
         {/* Header */}
         <div ref={titleRef} className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
