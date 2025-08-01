@@ -88,7 +88,7 @@ const WatchlistCard = ({ coin, onRemove }: {
   useEffect(() => {
     if (cardRef.current) {
       ScrollTrigger.refresh();
-      
+
       gsap.fromTo(cardRef.current,
         {
           y: 30,
@@ -118,7 +118,7 @@ const WatchlistCard = ({ coin, onRemove }: {
           duration: 0.3,
           ease: "power2.out"
         });
-        
+
         const glow = cardRef.current?.querySelector('.card-glow');
         if (glow) {
           gsap.to(glow, {
@@ -135,7 +135,7 @@ const WatchlistCard = ({ coin, onRemove }: {
           duration: 0.3,
           ease: "power2.out"
         });
-        
+
         const glow = cardRef.current?.querySelector('.card-glow');
         if (glow) {
           gsap.to(glow, {
@@ -185,7 +185,7 @@ const WatchlistCard = ({ coin, onRemove }: {
       >
         {/* Glow effect */}
         <div className="card-glow absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 transition-opacity duration-300 rounded-xl"></div>
-        
+
         <div className="relative z-10">
           {/* Header with coin info and remove button */}
           <div className="flex items-center justify-between mb-4">
@@ -200,7 +200,7 @@ const WatchlistCard = ({ coin, onRemove }: {
                 <p className="text-sm text-gray-400 uppercase">{coin.symbol}</p>
               </div>
             </div>
-            
+
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -227,13 +227,12 @@ const WatchlistCard = ({ coin, onRemove }: {
           </div>
 
           {/* 24h Change */}
-          <div 
+          <div
             ref={changeRef}
-            className={`flex items-center space-x-1 mb-4 ${
-              coin.price_change_percentage_24h >= 0
+            className={`flex items-center space-x-1 mb-4 ${coin.price_change_percentage_24h >= 0
                 ? 'text-green-400'
                 : 'text-red-400'
-            }`}
+              }`}
           >
             {coin.price_change_percentage_24h >= 0 ? (
               <TrendingUp size={16} />
@@ -486,7 +485,7 @@ export default function Watchlist() {
     if (savedWatchlist) {
       const parsedWatchlist = JSON.parse(savedWatchlist);
       setStoredWatchlist(parsedWatchlist);
-      
+
       if (parsedWatchlist.length > 0) {
         fetchWatchlistData(parsedWatchlist);
       } else {
@@ -504,7 +503,7 @@ export default function Watchlist() {
       setError(null);
 
       const coinIds = watchlist.map(coin => coin.id).join(',');
-      
+
       const response = await api.get('/coins/markets', {
         params: {
           vs_currency: 'usd',
@@ -530,7 +529,7 @@ export default function Watchlist() {
     const newWatchlist = storedWatchlist.filter(coin => coin.id !== coinId);
     setStoredWatchlist(newWatchlist);
     localStorage.setItem('crypto-watchlist', JSON.stringify(newWatchlist));
-    
+
     // Update displayed coins
     const newWatchlistCoins = watchlistCoins.filter(coin => coin.id !== coinId);
     setWatchlistCoins(newWatchlistCoins);
@@ -570,19 +569,17 @@ export default function Watchlist() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4  pt-25 py-8">
+
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: "radial-gradient(125% 125% at 50% 10%, #000000 40%, #0d1a36 100%)",
+        }}
+      />
+      <div className="max-w-7xl mx-auto px-4  pt-30 py-8 font-roboto">
         {/* Header */}
         <div ref={titleRef} className="flex items-center justify-between mb-8">
           <div>
-            <div className="flex items-center space-x-3 mb-2">
-              <Link
-                href="/dashboard"
-                className="flex items-center space-x-2 text-gray-400 hover:text-white transition-all duration-300"
-              >
-                <ArrowLeft size={20} />
-                <span>Back to Markets</span>
-              </Link>
-            </div>
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               My Watchlist
             </h1>
@@ -590,7 +587,7 @@ export default function Watchlist() {
               Track your favorite cryptocurrencies and their performance
             </p>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Star className="text-yellow-400 fill-current" size={24} />
             <span className="text-xl font-semibold">{watchlistCoins.length} coins</span>
