@@ -350,7 +350,7 @@ const EmptyWatchlist = () => {
         Start adding cryptocurrencies to your watchlist to track their prices and performance.
       </p>
       <Link
-        href="/"
+        href="/dashboard"
         className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 text-white"
       >
         <span>Browse Markets</span>
