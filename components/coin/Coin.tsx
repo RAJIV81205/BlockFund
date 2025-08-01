@@ -719,7 +719,7 @@ export default function Coin() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4 pt-25 py-8">
+      <div className="max-w-7xl mx-auto px-4 pt-25 py-8 font-roboto">
         {/* Header - matching Dashboard style */}
         <div ref={headerRef} className="flex items-center justify-between mb-8">
           <Link 
