@@ -87,7 +87,7 @@ export default function CampaignPage() {
       console.log('Campaign:', campaign);
       console.log('Selected Tier Index:', selectedTier);
       console.log('Selected Tier:', campaign.tiers[selectedTier]);
-      console.log('User Address:', userAddress);
+      console.log('User Address:', account);
       
       const tierAmount = campaign.tiers[selectedTier].amount;
       await web3Service.fundCampaignWithValidation(address, selectedTier, tierAmount);
@@ -533,7 +533,7 @@ export default function CampaignPage() {
         )}
 
         {/* Refund Section for Failed Campaigns */}
-        {campaign.state === 2 && userAddress && !isOwner() && (
+        {campaign.state === 2 && account && !isOwner() && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-bold text-red-800 mb-2">Campaign Failed</h2>
             <p className="text-red-700 mb-4">
@@ -550,7 +550,7 @@ export default function CampaignPage() {
 
         {/* Funding Section */}
         {!isOwner() && campaign.state === 0 && !campaign.paused && campaign.tiers.length > 0 && (
-          !userAddress ? (
+          !account ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Connect Wallet to Fund</h2>
               <button
