@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { web3Service } from "@/lib/web3";
-import { useWeb3 } from "@/hooks/useWeb3";
+import { useWeb3 } from "@/contexts/Web3Context";
 import { CampaignState } from "@/lib/contracts";
 
 interface Campaign {
@@ -40,6 +40,8 @@ export default function MyCampaignsPage() {
       loadMyCampaigns();
     } else {
       setLoading(false);
+      setCampaigns([]);
+      setCampaignDetails({});
     }
   }, [isConnected, account]);
 

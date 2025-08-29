@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { web3Service } from '@/lib/web3';
+import { useWeb3 } from '@/contexts/Web3Context';
 
 interface CampaignDetails {
   name: string;
@@ -23,11 +24,11 @@ interface CampaignDetails {
 export default function CampaignPage() {
   const params = useParams();
   const address = params.address as string;
+  const { account, isConnected, connectWallet } = useWeb3();
 
   const [campaign, setCampaign] = useState<CampaignDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userAddress, setUserAddress] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<number>(0);
   const [funding, setFunding] = useState(false);
 
@@ -45,8 +46,7 @@ export default function CampaignPage() {
 
   useEffect(() => {
     loadCampaign();
-    checkUserConnection();
-  }, [address]);
+  }, [address, account]);
 
   const loadCampaign = async () => {
     try {
@@ -61,22 +61,10 @@ export default function CampaignPage() {
     }
   };
 
-  const checkUserConnection = async () => {
-    const account = await web3Service.getAccount();
-    setUserAddress(account);
-  };
 
-  const connectWallet = async () => {
-    try {
-      const account = await web3Service.connectWallet();
-      setUserAddress(account);
-    } catch (err) {
-      setError('Failed to connect wallet');
-    }
-  };
 
   const handleFund = async () => {
-    if (!campaign || !userAddress) {
+    if (!campaign || !account) {
       setError('Please connect your wallet first');
       return;
     }
@@ -119,7 +107,7 @@ export default function CampaignPage() {
   const debugCampaign = async () => {
     console.log('=== CAMPAIGN DEBUG ===');
     console.log('Campaign Address:', address);
-    console.log('User Address:', userAddress);
+    console.log('User Address:', account);
     console.log('Campaign Details:', campaign);
     
     if (campaign) {
@@ -171,7 +159,7 @@ export default function CampaignPage() {
   };
 
   const isOwner = () => {
-    return userAddress && campaign && userAddress.toLowerCase() === campaign.owner.toLowerCase();
+    return account && campaign && account.toLowerCase() === campaign.owner.toLowerCase();
   };
 
   const handleAddTier = async () => {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { web3Service } from "@/lib/web3";
-import { useWeb3 } from "@/hooks/useWeb3";
+import { useWeb3 } from "@/contexts/Web3Context";
 
 export default function CreateCampaignPage() {
   const router = useRouter();

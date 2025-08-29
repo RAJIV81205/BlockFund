@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useWeb3 } from "@/hooks/useWeb3";
+import { useWeb3 } from "@/contexts/Web3Context";
 
 export default function Navbar() {
   const { account, isConnecting, connectWallet, isConnected } = useWeb3();
@@ -25,7 +25,7 @@ export default function Navbar() {
           <Link href="/my-campaigns" className="hover:text-blue-200">
             My Campaigns
           </Link>
-          
+
           {isConnected ? (
             <div className="bg-blue-700 px-3 py-1 rounded text-sm">
               {account?.slice(0, 6)}...{account?.slice(-4)}
