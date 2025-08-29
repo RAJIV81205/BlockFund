@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "dotenv": "^17.2.1",
+    "ethers": "^6.15.0",
     "hardhat": "^3.0.3",
     "next": "15.5.2",
     "react": "19.1.0",
