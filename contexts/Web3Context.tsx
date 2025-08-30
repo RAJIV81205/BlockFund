@@ -34,7 +34,8 @@ export function Web3Provider({ children }: Web3ProviderProps) {
 
         // Listen for account changes
         if (window.ethereum) {
-            const handleAccountsChanged = async (accounts: string[]) => {
+            const handleAccountsChanged = async (...args: unknown[]) => {
+                const accounts = args[0] as string[];
                 
                 if (accounts.length > 0) {
                     // Reinitialize the web3Service with the new account
@@ -58,13 +59,13 @@ export function Web3Provider({ children }: Web3ProviderProps) {
                 window.location.reload();
             };
 
-            window.ethereum.on('accountsChanged', handleAccountsChanged);
-            window.ethereum.on('chainChanged', handleChainChanged);
+            window.ethereum?.on?.('accountsChanged', handleAccountsChanged);
+            window.ethereum?.on?.('chainChanged', handleChainChanged);
 
             return () => {
                 // clearInterval(pollInterval);
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-                window.ethereum.removeListener('chainChanged', handleChainChanged);
+                window.ethereum?.removeListener?.('accountsChanged', handleAccountsChanged);
+                window.ethereum?.removeListener?.('chainChanged', handleChainChanged);
             };
         }
     }, []); // Remove account from dependency array to prevent infinite re-renders

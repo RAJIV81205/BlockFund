@@ -72,14 +72,7 @@ export default function HomePage() {
     }
   };
 
-  const getStateColor = (state: number) => {
-    switch (state) {
-      case CampaignState.Active: return "text-emerald-600";
-      case CampaignState.Successful: return "text-blue-600";
-      case CampaignState.Failed: return "text-rose-600";
-      default: return "text-slate-600";
-    }
-  };
+
 
   const getStateBadgeColor = (state: number) => {
     switch (state) {

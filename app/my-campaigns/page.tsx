@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { web3Service } from "@/lib/web3";
 import { useWeb3 } from "@/contexts/Web3Context";
 import { CampaignState } from "@/lib/contracts";
@@ -35,17 +35,7 @@ export default function MyCampaignsPage() {
   const [campaignDetails, setCampaignDetails] = useState<Record<string, CampaignDetails>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (isConnected && account) {
-      loadMyCampaigns();
-    } else {
-      setLoading(false);
-      setCampaigns([]);
-      setCampaignDetails({});
-    }
-  }, [isConnected, account]);
-
-  const loadMyCampaigns = async () => {
+  const loadMyCampaigns = useCallback(async () => {
     if (!account) return;
     
     try {
@@ -68,7 +58,17 @@ export default function MyCampaignsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (isConnected && account) {
+      loadMyCampaigns();
+    } else {
+      setLoading(false);
+      setCampaigns([]);
+      setCampaignDetails({});
+    }
+  }, [isConnected, account, loadMyCampaigns]);
 
   const getStateText = (state: number) => {
     switch (state) {
@@ -142,7 +142,7 @@ export default function MyCampaignsPage() {
           <div className="max-w-md mx-auto">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">No Campaigns Yet</h2>
             <p className="text-gray-600 mb-6">
-              You haven't created any campaigns yet. Start your first crowdfunding campaign today!
+              You haven&apos;t created any campaigns yet. Start your first crowdfunding campaign today!
             </p>
             <Link
               href="/create"

@@ -51,9 +51,10 @@ export default function CreateCampaignPage() {
       console.log("Campaign created:", tx);
       alert("Campaign created successfully!");
       router.push("/campaigns");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create campaign:", error);
-      alert(`Failed to create campaign: ${error.message || error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Failed to create campaign: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

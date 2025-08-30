@@ -19,7 +19,11 @@ import { FACTORY_ADDRESS, FACTORY_ABI, CROWDFUNDING_ABI } from './contracts';
 
 declare global {
   interface Window {
-    ethereum?: any;
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+      removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
   }
 }
 
@@ -149,13 +153,14 @@ export class Web3Service {
       console.log('Campaigns length:', campaigns.length);
 
       return campaigns;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching campaigns:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        data: error.data
-      });
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name
+        });
+      }
       throw error;
     }
   }
@@ -190,15 +195,15 @@ export class Web3Service {
       ]);
 
       // Try to get tiers, fallback to empty array if function doesn't exist
-      let tiers = [];
+      let tiers: Array<{ name: string; amount: string; backers: number }> = [];
       try {
         const tiersResult = await campaign.fetTiers();
-        tiers = tiersResult.map((tier: any) => ({
+        tiers = tiersResult.map((tier: { name: string; amount: bigint; backers: bigint }) => ({
           name: tier.name,
           amount: ethers.formatEther(tier.amount),
           backers: Number(tier.backers)
         }));
-      } catch (tierError) {
+      } catch {
         console.log('fetTiers function not available, using empty tiers array');
         tiers = [];
       }
@@ -243,20 +248,21 @@ export class Web3Service {
         // Try to get more specific error information
         try {
           await campaign.fund.staticCall(tierIndex, { value: amountWei });
-        } catch (staticError: any) {
+        } catch (staticError: unknown) {
           console.error('Static call failed:', staticError);
 
           // Parse common error messages
-          if (staticError.message.includes('Invalid Tier')) {
+          const errorMessage = staticError instanceof Error ? staticError.message : String(staticError);
+          if (errorMessage.includes('Invalid Tier')) {
             throw new Error('Invalid tier index - this tier does not exist');
-          } else if (staticError.message.includes('Incorrect Amount')) {
+          } else if (errorMessage.includes('Incorrect Amount')) {
             throw new Error('Incorrect amount - must match the tier amount exactly');
-          } else if (staticError.message.includes('Campaign is not active')) {
+          } else if (errorMessage.includes('Campaign is not active')) {
             throw new Error('Campaign is not active');
-          } else if (staticError.message.includes('Contract is paused')) {
+          } else if (errorMessage.includes('Contract is paused')) {
             throw new Error('Campaign is paused');
           } else {
-            throw new Error(`Transaction would fail: ${staticError.message}`);
+            throw new Error(`Transaction would fail: ${errorMessage}`);
           }
         }
         throw gasError;
@@ -665,7 +671,7 @@ export class Web3Service {
     }
 
     try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string;
       return parseInt(chainId, 16);
     } catch (error) {
       console.error('Error getting current network:', error);
@@ -745,9 +751,10 @@ export class Web3Service {
         params: [{ chainId: '0x7a69' }], // 31337 in hex
       });
       return true;
-    } catch (switchError: any) {
+    } catch (switchError: unknown) {
       // If the chain hasn't been added to MetaMask, add it
-      if (switchError.code === 4902) {
+      const error = switchError as { code?: number };
+      if (error.code === 4902) {
         try {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
@@ -790,9 +797,10 @@ export class Web3Service {
         params: [{ chainId: '0x4268' }], // 17000 in hex
       });
       return true;
-    } catch (switchError: any) {
+    } catch (switchError: unknown) {
       // If the chain hasn't been added to MetaMask, add it
-      if (switchError.code === 4902) {
+      const error = switchError as { code?: number };
+      if (error.code === 4902) {
         try {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { web3Service } from '@/lib/web3';
 import { useWeb3 } from '@/contexts/Web3Context';
@@ -24,7 +24,7 @@ interface CampaignDetails {
 export default function CampaignPage() {
   const params = useParams();
   const address = params.address as string;
-  const { account, isConnected, connectWallet } = useWeb3();
+  const { account, connectWallet } = useWeb3();
 
   const [campaign, setCampaign] = useState<CampaignDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,11 +44,7 @@ export default function CampaignPage() {
   const [extendDays, setExtendDays] = useState('');
   const [extending, setExtending] = useState(false);
 
-  useEffect(() => {
-    loadCampaign();
-  }, [address, account]);
-
-  const loadCampaign = async () => {
+  const loadCampaign = useCallback(async () => {
     try {
       setLoading(true);
       const details = await web3Service.getCampaignDetails(address);
@@ -59,7 +55,11 @@ export default function CampaignPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [address]);
+
+  useEffect(() => {
+    loadCampaign();
+  }, [loadCampaign]);
 
 
 
@@ -96,49 +96,15 @@ export default function CampaignPage() {
       // Success message
       setError(null);
       alert(`Successfully funded ${tierAmount} ETH to ${campaign.tiers[selectedTier].name}!`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Funding error:', err);
-      setError(err.message || 'Failed to fund campaign');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fund campaign';
+      setError(errorMessage);
     } finally {
       setFunding(false);
     }
   };
 
-  const debugCampaign = async () => {
-    console.log('=== CAMPAIGN DEBUG ===');
-    console.log('Campaign Address:', address);
-    console.log('User Address:', account);
-    console.log('Campaign Details:', campaign);
-
-    if (campaign) {
-      console.log('Campaign State:', campaign.state);
-      console.log('Campaign Paused:', campaign.paused);
-      console.log('Tiers Count:', campaign.tiers.length);
-      console.log('Selected Tier Index:', selectedTier);
-      console.log('Is Owner:', isOwner());
-
-      if (campaign.tiers.length > 0) {
-        console.log('Available Tiers:', campaign.tiers);
-        console.log('Selected Tier:', campaign.tiers[selectedTier]);
-      }
-    }
-
-    try {
-      const contractExists = await web3Service.checkContractExists(address);
-      console.log('Contract Exists:', contractExists);
-
-      const currentNetwork = await web3Service.getCurrentNetwork();
-      console.log('Current Network Chain ID:', currentNetwork);
-
-      const factoryPaused = await web3Service.isFactoryPaused();
-      console.log('Factory Paused:', factoryPaused);
-
-      // Switch to correct network if needed
-      await web3Service.switchToCorrectNetwork();
-    } catch (error) {
-      console.error('Debug error:', error);
-    }
-  };
 
   const formatDeadline = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString();
@@ -173,8 +139,9 @@ export default function CampaignPage() {
       setNewTierAmount('');
       setShowAddTier(false);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to add tier');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add tier';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setAddingTier(false);
@@ -189,8 +156,9 @@ export default function CampaignPage() {
       await web3Service.removeTierWithValidation(address, tierIndex);
       await loadCampaign();
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to remove tier');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove tier';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setRemovingTier(null);
@@ -203,8 +171,9 @@ export default function CampaignPage() {
       await web3Service.withdrawFunds(address);
       await loadCampaign();
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to withdraw funds');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to withdraw funds';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setWithdrawing(false);
@@ -217,8 +186,9 @@ export default function CampaignPage() {
       await web3Service.toggleCampaignPause(address);
       await loadCampaign();
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to toggle pause');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to toggle pause';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setPausing(false);
@@ -234,8 +204,9 @@ export default function CampaignPage() {
       await loadCampaign();
       setExtendDays('');
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to extend deadline');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to extend deadline';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setExtending(false);
@@ -247,8 +218,9 @@ export default function CampaignPage() {
       await web3Service.refund(address);
       await loadCampaign();
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to get refund');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get refund';
+      setError(errorMessage);
       console.error(err);
     }
   };
@@ -633,7 +605,7 @@ export default function CampaignPage() {
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                 <h2 className="text-xl font-bold text-yellow-800 mb-2">No Tiers Available</h2>
                 <p className="text-yellow-700">
-                  The campaign owner hasn't set up any funding tiers yet.
+                  The campaign owner hasn&apos;t set up any funding tiers yet.
                 </p>
               </div>
             )}
