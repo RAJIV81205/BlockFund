@@ -95,7 +95,7 @@ export default function CampaignPage() {
 
       // Success message
       setError(null);
-      alert(`Successfully funded ${tierAmount} ETH to ${campaign.tiers[selectedTier].name}!`);
+      alert(`Successfully funded ${tierAmount} ETH to ${campaign.name}!`);
     } catch (err: unknown) {
       console.error('Funding error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fund campaign';
@@ -549,10 +549,9 @@ export default function CampaignPage() {
                   </label>
                   <input
                     type="number"
-                    step="0.001"
                     value={campaign.tiers[selectedTier]?.amount || ''}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
                     placeholder="Select a tier above"
                   />
                 </div>

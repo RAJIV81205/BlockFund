@@ -8,6 +8,7 @@ import React, {
   ReactNode,
 } from "react";
 import { web3Service } from "@/lib/web3";
+import { useRealTimeUpdates } from "@/hooks/useRealTimeUpdates";
 
 
 declare global {
@@ -29,6 +30,11 @@ interface Web3ContextType {
   connectWallet: () => Promise<void>;
   isConnected: boolean;
   balance : string | null;
+  campaigns: any[];
+  campaignsLoading: boolean;
+  campaignsError: string | null;
+  lastUpdate: Date | null;
+  refreshCampaigns: () => void;
 }
 
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
@@ -41,6 +47,19 @@ export function Web3Provider({ children }: Web3ProviderProps) {
   const [account, setAccount] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
+  
+  // Use the real-time updates hook
+  const {
+    campaigns,
+    loading: campaignsLoading,
+    error: campaignsError,
+    lastUpdate,
+    refresh: refreshCampaigns
+  } = useRealTimeUpdates({
+    enablePolling: true,
+    pollingInterval: 30000,
+    enableEventListeners: true
+  });
 
   useEffect(() => {
     if (!window.ethereum) return;
@@ -113,7 +132,12 @@ export function Web3Provider({ children }: Web3ProviderProps) {
     isConnecting,
     connectWallet,
     isConnected: !!account,
-    balance
+    balance,
+    campaigns,
+    campaignsLoading,
+    campaignsError,
+    lastUpdate,
+    refreshCampaigns
   };
 
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;

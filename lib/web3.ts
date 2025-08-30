@@ -30,6 +30,8 @@ declare global {
 export class Web3Service {
   private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.JsonRpcSigner | null = null;
+  private eventListeners: Map<string, any> = new Map();
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   async connectWallet(): Promise<string | null> {
     if (!window.ethereum) {
@@ -830,6 +832,162 @@ export class Web3Service {
         console.error('Failed to switch to Holesky network:', switchError);
         return false;
       }
+    }
+  }
+
+  // Event listening methods for real-time updates
+  async listenForCampaignCreated(callback: (campaignData: any) => void) {
+    try {
+      let factory;
+      if (this.signer) {
+        factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (campaignAddress: string, owner: string, name: string, timestamp: bigint) => {
+        callback({
+          campaignAddress,
+          owner,
+          name,
+          creationTime: Number(timestamp)
+        });
+      };
+
+      factory.on("CampaignCreated", listener);
+      this.eventListeners.set('CampaignCreated', { contract: factory, listener });
+      
+      console.log('Started listening for CampaignCreated events');
+    } catch (error) {
+      console.error('Error setting up CampaignCreated listener:', error);
+    }
+  }
+
+  async listenForCampaignFunded(campaignAddress: string, callback: (fundingData: any) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (backer: string, amount: bigint, tierIndex: bigint) => {
+        callback({
+          backer,
+          amount: ethers.formatEther(amount),
+          tierIndex: Number(tierIndex),
+          campaignAddress
+        });
+      };
+
+      // Note: You'll need to add this event to your smart contract if it doesn't exist
+      campaign.on("FundReceived", listener);
+      this.eventListeners.set(`FundReceived_${campaignAddress}`, { contract: campaign, listener });
+      
+      console.log(`Started listening for FundReceived events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up FundReceived listener:', error);
+    }
+  }
+
+  async listenForCampaignStateChange(campaignAddress: string, callback: (stateData: any) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (newState: bigint) => {
+        callback({
+          newState: Number(newState),
+          campaignAddress
+        });
+      };
+
+      // Note: You'll need to add this event to your smart contract if it doesn't exist
+      campaign.on("CampaignStateChanged", listener);
+      this.eventListeners.set(`CampaignStateChanged_${campaignAddress}`, { contract: campaign, listener });
+      
+      console.log(`Started listening for CampaignStateChanged events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up CampaignStateChanged listener:', error);
+    }
+  }
+
+  // Polling method for campaigns that don't have events
+  startPollingForUpdates(callback: (campaigns: any[]) => void, intervalMs: number = 30000) {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const campaigns = await this.getAllCampaigns();
+        callback(campaigns);
+      } catch (error) {
+        console.error('Error polling for campaign updates:', error);
+      }
+    }, intervalMs);
+
+    console.log(`Started polling for campaign updates every ${intervalMs}ms`);
+  }
+
+  stopPollingForUpdates() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      console.log('Stopped polling for campaign updates');
+    }
+  }
+
+  // Stop all event listeners
+  stopAllEventListeners() {
+    this.eventListeners.forEach((listenerData, key) => {
+      try {
+        listenerData.contract.removeListener(key.split('_')[0], listenerData.listener);
+      } catch (error) {
+        console.error(`Error removing listener ${key}:`, error);
+      }
+    });
+    this.eventListeners.clear();
+    this.stopPollingForUpdates();
+    console.log('Stopped all event listeners');
+  }
+
+  // Method to refresh campaign data when events are received
+  async refreshCampaignData(campaignAddress: string) {
+    try {
+      return await this.getCampaignDetails(campaignAddress);
+    } catch (error) {
+      console.error('Error refreshing campaign data:', error);
+      return null;
+    }
+  }
+
+  // Method to check for new campaigns periodically
+  async checkForNewCampaigns(lastKnownCount: number): Promise<any[]> {
+    try {
+      const allCampaigns = await this.getAllCampaigns();
+      if (allCampaigns.length > lastKnownCount) {
+        // Return only the new campaigns
+        return allCampaigns.slice(lastKnownCount);
+      }
+      return [];
+    } catch (error) {
+      console.error('Error checking for new campaigns:', error);
+      return [];
     }
   }
 }

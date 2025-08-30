@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { web3Service } from "@/lib/web3";
 import { CampaignState } from "@/lib/contracts";
+import { useWeb3 } from "@/contexts/Web3Context";
 
 interface Campaign {
   campaignAddress: string;
@@ -29,26 +30,34 @@ interface CampaignDetails {
 }
 
 export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const { 
+    campaigns, 
+    campaignsLoading, 
+    campaignsError, 
+    lastUpdate, 
+    refreshCampaigns 
+  } = useWeb3();
+  
   const [campaignDetails, setCampaignDetails] = useState<Record<string, CampaignDetails>>({});
-  const [loading, setLoading] = useState(true);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
 
+  // Load campaign details when campaigns change
   useEffect(() => {
-    loadCampaigns();
-  }, []);
+    loadCampaignDetails();
+  }, [campaigns]);
 
-  const loadCampaigns = async () => {
+  const loadCampaignDetails = async () => {
+    if (campaigns.length === 0) return;
+    
+    setDetailsLoading(true);
     try {
       // Ensure we're on the correct network
       await web3Service.switchToCorrectNetwork();
       
-      const allCampaigns = await web3Service.getAllCampaigns();
-      setCampaigns(allCampaigns);
-      
       // Load details for each campaign
       const details: Record<string, CampaignDetails> = {};
-      for (const campaign of allCampaigns) {
+      for (const campaign of campaigns) {
         try {
           const detail = await web3Service.getCampaignDetails(campaign.campaignAddress);
           details[campaign.campaignAddress] = detail;
@@ -58,9 +67,9 @@ export default function CampaignsPage() {
       }
       setCampaignDetails(details);
     } catch (error) {
-      console.error('Failed to load campaigns:', error);
+      console.error('Failed to load campaign details:', error);
     } finally {
-      setLoading(false);
+      setDetailsLoading(false);
     }
   };
 
@@ -111,14 +120,36 @@ export default function CampaignsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">All Campaigns</h1>
-        <Link
-          href="/create"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
-        >
-          Create Campaign
-        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">All Campaigns</h1>
+          {lastUpdate && (
+            <p className="text-sm text-gray-500 mt-1">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={refreshCampaigns}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold"
+            disabled={campaignsLoading}
+          >
+            {campaignsLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <Link
+            href="/create"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
+          >
+            Create Campaign
+          </Link>
+        </div>
       </div>
+
+      {campaignsError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          Error loading campaigns: {campaignsError}
+        </div>
+      )}
 
       {/* Filter Buttons */}
       <div className="flex space-x-2 mb-8">
@@ -137,7 +168,7 @@ export default function CampaignsPage() {
         ))}
       </div>
 
-      {loading ? (
+      {(campaignsLoading || detailsLoading) ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(9)].map((_, i) => (
             <div key={i} className="bg-white rounded-lg shadow-md p-6 animate-pulse">

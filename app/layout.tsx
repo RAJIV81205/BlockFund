@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins , Space_Grotesk , Urbanist } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import RealTimeUpdates from "@/components/RealTimeUpdates";
 import { Web3Provider } from "@/contexts/Web3Context";
 
 
@@ -43,6 +44,7 @@ export default function RootLayout({
           <main className="min-h-screen bg-gray-50 font-space-grotesk pt-15">
             {children}
           </main>
+          <RealTimeUpdates />
         </Web3Provider>
       </body>
     </html>
