@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useWeb3 } from "@/contexts/Web3Context";
+import Image from "next/image";
 
 export default function Navbar() {
-  const { account, isConnecting, connectWallet, isConnected } = useWeb3();
+  const { account, isConnecting, connectWallet, isConnected, balance } = useWeb3();
 
   return (
     <nav className=" border-b border-gray-200 font-space-grotesk absolute w-full bg-white">
@@ -35,16 +36,21 @@ export default function Navbar() {
             {isConnected ? (
               <div className="flex items-center space-x-3 border border-gray-300 rounded-lg px-4 py-2">
                 {/* Avatar */}
-                <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-medium">
-                    {account?.slice(2, 4).toUpperCase()}
+                <Image
+                  src="/Ethereum-logo.webp"
+                  alt="Ethereum logo"
+                  width={20}
+                  height={20}
+                />
+                {/* Account Info */}
+                <div className="flex flex-col">
+                  <span className="text-sm font-mono text-gray-900">
+                    {account?.slice(0, 10)}...{account?.slice(-4)}
+                  </span>
+                  <span className="text-sm font-mono text-gray-900">
+                    {balance?.slice(0, 6)} ETH
                   </span>
                 </div>
-
-                {/* Account Info */}
-                <span className="text-sm font-mono text-gray-900">
-                  {account?.slice(0, 6)}...{account?.slice(-4)}
-                </span>
               </div>
             ) : (
               <button
