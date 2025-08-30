@@ -10,6 +10,13 @@ import React, {
 import { web3Service } from "@/lib/web3";
 import { useRealTimeUpdates } from "@/hooks/useRealTimeUpdates";
 
+interface Campaign {
+  campaignAddress: string;
+  owner: string;
+  name: string;
+  creationTime: number;
+}
+
 
 declare global {
   interface EthereumProvider {
@@ -30,7 +37,7 @@ interface Web3ContextType {
   connectWallet: () => Promise<void>;
   isConnected: boolean;
   balance : string | null;
-  campaigns: any[];
+  campaigns: Campaign[];
   campaignsLoading: boolean;
   campaignsError: string | null;
   lastUpdate: Date | null;

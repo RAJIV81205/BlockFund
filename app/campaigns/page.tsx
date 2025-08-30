@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { web3Service } from "@/lib/web3";
 import { CampaignState } from "@/lib/contracts";
 import { useWeb3 } from "@/contexts/Web3Context";
 
-interface Campaign {
-  campaignAddress: string;
-  owner: string;
-  name: string;
-  creationTime: number;
-}
+
 
 interface CampaignDetails {
   name: string;
@@ -42,12 +37,7 @@ export default function CampaignsPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
 
-  // Load campaign details when campaigns change
-  useEffect(() => {
-    loadCampaignDetails();
-  }, [campaigns]);
-
-  const loadCampaignDetails = async () => {
+  const loadCampaignDetails = useCallback(async () => {
     if (campaigns.length === 0) return;
     
     setDetailsLoading(true);
@@ -71,7 +61,12 @@ export default function CampaignsPage() {
     } finally {
       setDetailsLoading(false);
     }
-  };
+  }, [campaigns]);
+
+  // Load campaign details when campaigns change
+  useEffect(() => {
+    loadCampaignDetails();
+  }, [campaigns, loadCampaignDetails]);
 
   const getStateText = (state: number) => {
     switch (state) {

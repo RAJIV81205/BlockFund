@@ -1,6 +1,13 @@
 import { ethers } from 'ethers';
 import { FACTORY_ADDRESS, FACTORY_ABI, CROWDFUNDING_ABI } from './contracts';
 
+interface Campaign {
+  campaignAddress: string;
+  owner: string;
+  name: string;
+  creationTime: number;
+}
+
 /**
  * Web3 Service for Crowdfunding DApp
  * 
@@ -30,7 +37,7 @@ declare global {
 export class Web3Service {
   private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.JsonRpcSigner | null = null;
-  private eventListeners: Map<string, any> = new Map();
+  private eventListeners: Map<string, { contract: ethers.Contract; listener: (...args: unknown[]) => void }> = new Map();
   private pollingInterval: NodeJS.Timeout | null = null;
 
   async connectWallet(): Promise<string | null> {
@@ -836,7 +843,12 @@ export class Web3Service {
   }
 
   // Event listening methods for real-time updates
-  async listenForCampaignCreated(callback: (campaignData: any) => void) {
+  async listenForCampaignCreated(callback: (campaignData: {
+    campaignAddress: string;
+    owner: string;
+    name: string;
+    creationTime: number;
+  }) => void) {
     try {
       let factory;
       if (this.signer) {
@@ -858,7 +870,7 @@ export class Web3Service {
       };
 
       factory.on("CampaignCreated", listener);
-      this.eventListeners.set('CampaignCreated', { contract: factory, listener });
+      this.eventListeners.set('CampaignCreated', { contract: factory, listener: listener as (...args: unknown[]) => void });
       
       console.log('Started listening for CampaignCreated events');
     } catch (error) {
@@ -866,7 +878,12 @@ export class Web3Service {
     }
   }
 
-  async listenForCampaignFunded(campaignAddress: string, callback: (fundingData: any) => void) {
+  async listenForCampaignFunded(campaignAddress: string, callback: (fundingData: {
+    backer: string;
+    amount: string;
+    tierIndex: number;
+    campaignAddress: string;
+  }) => void) {
     try {
       let campaign;
       if (this.signer) {
@@ -889,7 +906,7 @@ export class Web3Service {
 
       // Note: You'll need to add this event to your smart contract if it doesn't exist
       campaign.on("FundReceived", listener);
-      this.eventListeners.set(`FundReceived_${campaignAddress}`, { contract: campaign, listener });
+      this.eventListeners.set(`FundReceived_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
       
       console.log(`Started listening for FundReceived events on campaign ${campaignAddress}`);
     } catch (error) {
@@ -897,7 +914,10 @@ export class Web3Service {
     }
   }
 
-  async listenForCampaignStateChange(campaignAddress: string, callback: (stateData: any) => void) {
+  async listenForCampaignStateChange(campaignAddress: string, callback: (stateData: {
+    newState: number;
+    campaignAddress: string;
+  }) => void) {
     try {
       let campaign;
       if (this.signer) {
@@ -918,7 +938,7 @@ export class Web3Service {
 
       // Note: You'll need to add this event to your smart contract if it doesn't exist
       campaign.on("CampaignStateChanged", listener);
-      this.eventListeners.set(`CampaignStateChanged_${campaignAddress}`, { contract: campaign, listener });
+      this.eventListeners.set(`CampaignStateChanged_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
       
       console.log(`Started listening for CampaignStateChanged events on campaign ${campaignAddress}`);
     } catch (error) {
@@ -927,7 +947,7 @@ export class Web3Service {
   }
 
   // Polling method for campaigns that don't have events
-  startPollingForUpdates(callback: (campaigns: any[]) => void, intervalMs: number = 30000) {
+  startPollingForUpdates(callback: (campaigns: Campaign[]) => void, intervalMs: number = 30000) {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }
@@ -977,7 +997,7 @@ export class Web3Service {
   }
 
   // Method to check for new campaigns periodically
-  async checkForNewCampaigns(lastKnownCount: number): Promise<any[]> {
+  async checkForNewCampaigns(lastKnownCount: number): Promise<Campaign[]> {
     try {
       const allCampaigns = await this.getAllCampaigns();
       if (allCampaigns.length > lastKnownCount) {

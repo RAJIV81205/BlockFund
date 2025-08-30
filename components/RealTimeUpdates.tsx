@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useWeb3 } from '@/contexts/Web3Context';
 
 interface Notification {
@@ -16,6 +16,20 @@ export default function RealTimeUpdates() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [previousCampaignCount, setPreviousCampaignCount] = useState(0);
 
+  const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: Date.now().toString()
+    };
+    
+    setNotifications(prev => [newNotification, ...prev.slice(0, 4)]); // Keep only 5 notifications
+    
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
+    }, 5000);
+  }, []);
+
   useEffect(() => {
     // Check for new campaigns
     if (campaigns.length > previousCampaignCount && previousCampaignCount > 0) {
@@ -29,21 +43,7 @@ export default function RealTimeUpdates() {
       });
     }
     setPreviousCampaignCount(campaigns.length);
-  }, [campaigns, previousCampaignCount]);
-
-  const addNotification = (notification: Omit<Notification, 'id'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Date.now().toString()
-    };
-    
-    setNotifications(prev => [newNotification, ...prev.slice(0, 4)]); // Keep only 5 notifications
-    
-    // Auto-hide notification after 5 seconds
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
-    }, 5000);
-  };
+  }, [campaigns, previousCampaignCount, addNotification]);
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {

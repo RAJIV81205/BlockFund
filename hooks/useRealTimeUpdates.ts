@@ -41,7 +41,7 @@ export const useRealTimeUpdates = ({
   }, []);
 
   // Handle new campaign created
-  const handleNewCampaign = useCallback((campaignData: any) => {
+  const handleNewCampaign = useCallback((campaignData: Campaign) => {
     console.log('New campaign created:', campaignData);
     setCampaigns(prev => {
       // Check if campaign already exists to avoid duplicates
@@ -67,7 +67,12 @@ export const useRealTimeUpdates = ({
   }, []);
 
   // Handle campaign funding events
-  const handleCampaignFunded = useCallback((fundingData: any) => {
+  const handleCampaignFunded = useCallback((fundingData: {
+    backer: string;
+    amount: string;
+    tierIndex: number;
+    campaignAddress: string;
+  }) => {
     console.log('Campaign funded:', fundingData);
     setLastUpdate(new Date());
     // You can add specific logic here to update campaign details
@@ -75,7 +80,10 @@ export const useRealTimeUpdates = ({
   }, []);
 
   // Handle campaign state changes
-  const handleCampaignStateChange = useCallback((stateData: any) => {
+  const handleCampaignStateChange = useCallback((stateData: {
+    newState: number;
+    campaignAddress: string;
+  }) => {
     console.log('Campaign state changed:', stateData);
     setLastUpdate(new Date());
     // You can add specific logic here to update campaign state
