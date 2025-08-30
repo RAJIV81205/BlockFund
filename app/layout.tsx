@@ -40,7 +40,7 @@ export default function RootLayout({
       >
         <Web3Provider>
           <Navbar />
-          <main className="min-h-screen bg-gray-50 font-poppins pt-15">
+          <main className="min-h-screen bg-gray-50 font-space-grotesk pt-15">
             {children}
           </main>
         </Web3Provider>

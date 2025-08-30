@@ -47,7 +47,7 @@ export default function HomePage() {
 
       // Load details for each campaign
       const details: Record<string, CampaignDetails> = {};
-      for (const campaign of allCampaigns.slice(0, 6)) { // Load first 6 for homepage
+      for (const campaign of allCampaigns.slice(0, 3)) {
         try {
           const detail = await web3Service.getCampaignDetails(campaign.campaignAddress);
           details[campaign.campaignAddress] = detail;
@@ -101,7 +101,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative bg-white">
         <div className="max-w-4xl mx-auto px-6 py-30 text-center">
-          <h1 className="text-5xl md:text-6xl font-light text-slate-900 mb-6 tracking-tight">
+          <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
             Fund the Future
           </h1>
           <p className="text-xl text-slate-600 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
@@ -129,8 +129,8 @@ export default function HomePage() {
         <section className="mb-20">
           <div className="flex items-center justify-between mb-12">
             <h2 className="text-3xl font-light text-slate-900">Featured</h2>
-            <Link 
-              href="/campaigns" 
+            <Link
+              href="/campaigns"
               className="text-slate-600 hover:text-slate-900 font-medium flex items-center gap-2 group"
             >
               View all
@@ -155,8 +155,6 @@ export default function HomePage() {
               <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-slate-400 text-2xl">+</span>
               </div>
-              <h3 className="text-xl font-medium text-slate-900 mb-3">No campaigns yet</h3>
-              <p className="text-slate-600 mb-8">Be the first to create a campaign on our platform</p>
               <Link
                 href="/create"
                 className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-full font-medium transition-colors"
