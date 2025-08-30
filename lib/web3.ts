@@ -49,14 +49,45 @@ export class Web3Service {
     }
   }
 
+  async reinitializeSigner(): Promise<void> {
+    if (!window.ethereum) {
+      throw new Error('MetaMask is not installed');
+    }
+
+    try {
+      this.provider = new ethers.BrowserProvider(window.ethereum);
+      this.signer = await this.provider.getSigner();
+    } catch (error) {
+      console.error('Failed to reinitialize signer:', error);
+      this.provider = null;
+      this.signer = null;
+    }
+  }
+
   async getAccount(): Promise<string | null> {
     if (!this.signer) {
-      return null;
+      // Try to reinitialize if we don't have a signer
+      if (window.ethereum) {
+        try {
+          await this.reinitializeSigner();
+        } catch {
+          return null;
+        }
+      } else {
+        return null;
+      }
     }
+
     try {
-      return await this.signer.getAddress();
+      return await this.signer!.getAddress();
     } catch {
-      return null;
+      // If getting address fails, try to reinitialize once more
+      try {
+        await this.reinitializeSigner();
+        return await this.signer?.getAddress() || null;
+      } catch {
+        return null;
+      }
     }
   }
 
@@ -645,9 +676,9 @@ export class Web3Service {
   async switchToCorrectNetwork(): Promise<boolean> {
     // Detect which network to use based on the factory address
     const factoryAddress = FACTORY_ADDRESS.toLowerCase();
-    
+
     console.log('Factory Address:', factoryAddress);
-    
+
     // Hardhat localhost default address
     if (factoryAddress === '0x5fbdb2315678afecb367f032d93f642f64180aa3') {
       console.log('Detected localhost deployment, switching to localhost network...');
@@ -687,14 +718,14 @@ export class Web3Service {
     try {
       const currentNetwork = await this.getCurrentNetwork();
       const factoryAddress = FACTORY_ADDRESS.toLowerCase();
-      
+
       // Check if we're on the right network for the deployment
       if (factoryAddress === '0x5fbdb2315678afecb367f032d93f642f64180aa3') {
         return currentNetwork === 31337; // Localhost
       } else if (factoryAddress === '0x0e88327fb445393a674194740535175c1cbf1c26') {
         return currentNetwork === 17000; // Holesky
       }
-      
+
       return false;
     } catch (error) {
       console.error('Error checking network:', error);

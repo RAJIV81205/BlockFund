@@ -8,7 +8,6 @@ interface Web3ContextType {
     isConnecting: boolean;
     connectWallet: () => Promise<void>;
     isConnected: boolean;
-    refreshAccount: () => Promise<void>;
 }
 
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
@@ -21,13 +20,6 @@ export function Web3Provider({ children }: Web3ProviderProps) {
     const [account, setAccount] = useState<string | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
 
-    // Manual refresh function
-    const refreshAccount = async () => {
-        const currentAccount = await web3Service.getAccount();
-        if (currentAccount !== account) {
-            setAccount(currentAccount);
-        }
-    };
 
     useEffect(() => {
         // Check if already connected
@@ -38,17 +30,31 @@ export function Web3Provider({ children }: Web3ProviderProps) {
 
         checkConnection();
 
-        // Set up polling as backup (every 2 seconds)
-        const pollInterval = setInterval(refreshAccount, 2000);
+    
 
         // Listen for account changes
         if (window.ethereum) {
-            const handleAccountsChanged = (accounts: string[]) => {
-                const newAccount = accounts[0] || null;
-                setAccount(newAccount);
+            const handleAccountsChanged = async (accounts: string[]) => {
+                
+                if (accounts.length > 0) {
+                    // Reinitialize the web3Service with the new account
+                    try {
+                        await web3Service.reinitializeSigner();
+                        const actualAccount = await web3Service.getAccount();
+                        console.log('[Web3Context] Reinitialized with account:', actualAccount);
+                        setAccount(actualAccount);
+                    } catch (error) {
+                        console.error('[Web3Context] Error reinitializing after account change:', error);
+                        setAccount(accounts[0]);
+                    }
+                } else {
+                    // No accounts connected
+                    setAccount(null);
+                }
             };
 
             const handleChainChanged = () => {
+                console.log('[Web3Context] Chain changed, reloading...');
                 window.location.reload();
             };
 
@@ -56,24 +62,21 @@ export function Web3Provider({ children }: Web3ProviderProps) {
             window.ethereum.on('chainChanged', handleChainChanged);
 
             return () => {
-                clearInterval(pollInterval);
+                // clearInterval(pollInterval);
                 window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
                 window.ethereum.removeListener('chainChanged', handleChainChanged);
             };
-        } else {
-            return () => {
-                clearInterval(pollInterval);
-            };
         }
-    }, [account]);
+    }, []); // Remove account from dependency array to prevent infinite re-renders
 
     const connectWallet = async () => {
         setIsConnecting(true);
         try {
             const account = await web3Service.connectWallet();
+            console.log('[Web3Context] Wallet connected:', account);
             setAccount(account);
         } catch (error) {
-            console.error('Failed to connect wallet:', error);
+            console.error('[Web3Context] Failed to connect wallet:', error);
         } finally {
             setIsConnecting(false);
         }
@@ -83,8 +86,7 @@ export function Web3Provider({ children }: Web3ProviderProps) {
         account,
         isConnecting,
         connectWallet,
-        isConnected: !!account,
-        refreshAccount
+        isConnected: !!account
     };
 
     return (
