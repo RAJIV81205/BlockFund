@@ -4,13 +4,30 @@ import { useState } from 'react';
 import { web3Service } from '@/lib/web3';
 import { FACTORY_ADDRESS } from '@/lib/contracts';
 
+interface DebugInfo {
+  currentNetwork?: number | null;
+  isCorrectNetwork?: boolean;
+  contractExists?: boolean;
+  factoryAddress?: string;
+  factoryOwner?: string;
+  factoryOwnerError?: string;
+  factoryPaused?: boolean;
+  factoryPausedError?: string;
+  campaignsCount?: number;
+  campaigns?: unknown[];
+  campaignsError?: string;
+  connectedAccount?: string | null;
+  accountError?: string;
+  generalError?: string;
+}
+
 export default function ContractDebug() {
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
   const runDiagnostics = async () => {
     setLoading(true);
-    const info: any = {};
+    const info: DebugInfo = {};
 
     try {
       // Check current network

@@ -63,8 +63,6 @@ export function Web3Provider({ children }: Web3ProviderProps) {
     lastUpdate,
     refresh: refreshCampaigns
   } = useRealTimeUpdates({
-    enablePolling: true,
-    pollingInterval: 30000,
     enableEventListeners: true
   });
 
