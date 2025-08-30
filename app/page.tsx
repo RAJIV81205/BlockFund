@@ -37,30 +37,6 @@ export default function HomePage() {
     loadCampaigns();
   }, []);
 
-  const debugConnection = async () => {
-    console.log('=== DEBUG CONNECTION ===');
-    try {
-      // Switch to correct network first
-      console.log('Switching to correct network...');
-      const switched = await web3Service.switchToCorrectNetwork();
-      console.log('Network switched:', switched);
-
-      // Try to connect wallet
-      const address = await web3Service.connectWallet();
-      console.log('Wallet connected:', address);
-
-      // Check if contract exists
-      const contractExists = await web3Service.checkContractExists('0x0E88327fb445393A674194740535175c1cBf1c26');
-      console.log('Contract exists:', contractExists);
-
-      // Try to get campaigns
-      const campaigns = await web3Service.getAllCampaigns();
-      console.log('Campaigns:', campaigns);
-    } catch (error) {
-      console.error('Debug failed:', error);
-    }
-  };
-
   const loadCampaigns = async () => {
     try {
       // Ensure we're on the correct network
@@ -98,10 +74,19 @@ export default function HomePage() {
 
   const getStateColor = (state: number) => {
     switch (state) {
-      case CampaignState.Active: return "text-green-600";
+      case CampaignState.Active: return "text-emerald-600";
       case CampaignState.Successful: return "text-blue-600";
-      case CampaignState.Failed: return "text-red-600";
-      default: return "text-gray-600";
+      case CampaignState.Failed: return "text-rose-600";
+      default: return "text-slate-600";
+    }
+  };
+
+  const getStateBadgeColor = (state: number) => {
+    switch (state) {
+      case CampaignState.Active: return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case CampaignState.Successful: return "bg-blue-50 text-blue-700 border-blue-200";
+      case CampaignState.Failed: return "bg-rose-50 text-rose-700 border-rose-200";
+      default: return "bg-slate-50 text-slate-700 border-slate-200";
     }
   };
 
@@ -119,146 +104,157 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-slate-50 mt-3">
       {/* Hero Section */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Decentralized Crowdfunding Platform
-        </h1>
-        <p className="text-xl text-gray-600 mb-8">
-          Create and fund campaigns on the blockchain with transparency and security
-        </p>
-        <div className="space-x-4">
-          <Link
-            href="/create"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
-          >
-            Create Campaign
-          </Link>
-          <Link
-            href="/campaigns"
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-3 rounded-lg font-semibold"
-          >
-            Browse Campaigns
-          </Link>
-          <button
-            onClick={debugConnection}
-            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold"
-          >
-            Debug Connection
-          </button>
-        </div>
-      </div>
-
-      {/* Featured Campaigns */}
-      <div className="mb-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured Campaigns</h2>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-6 animate-pulse">
-                <div className="h-4 bg-gray-200 rounded mb-4"></div>
-                <div className="h-3 bg-gray-200 rounded mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                <div className="h-2 bg-gray-200 rounded"></div>
-              </div>
-            ))}
-          </div>
-        ) : campaigns.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 mb-4">No campaigns found</p>
+      <section className="relative bg-white">
+        <div className="max-w-4xl mx-auto px-6 py-30 text-center">
+          <h1 className="text-5xl md:text-6xl font-light text-slate-900 mb-6 tracking-tight">
+            Fund the Future
+          </h1>
+          <p className="text-xl text-slate-600 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+            A transparent, blockchain-powered platform for bringing innovative ideas to life
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/create"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+              className="group bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-medium transition-all duration-200 hover:scale-105"
             >
-              Create the first campaign
+              Create Campaign
+            </Link>
+            <Link
+              href="/campaigns"
+              className="group border border-slate-300 hover:border-slate-400 text-slate-700 hover:text-slate-900 px-8 py-4 rounded-full font-medium transition-all duration-200 hover:bg-white"
+            >
+              Explore Projects
             </Link>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {campaigns.slice(0, 6).map((campaign) => {
-              const details = campaignDetails[campaign.campaignAddress];
-              if (!details) return null;
-
-              const progress = (parseFloat(details.balance) / parseFloat(details.goal)) * 100;
-
-              return (
-                <div key={campaign.campaignAddress} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
-                      {details.name}
-                    </h3>
-                    <span className={`text-sm font-medium ${getStateColor(details.state)}`}>
-                      {getStateText(details.state)}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {details.description}
-                  </p>
-
-                  <div className="mb-4">
-                    <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>Progress</span>
-                      <span>{progress.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${Math.min(progress, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between text-sm text-gray-600 mb-4">
-                    <span>{details.balance} ETH raised</span>
-                    <span>Goal: {details.goal} ETH</span>
-                  </div>
-
-                  <div className="flex justify-between text-sm text-gray-600 mb-4">
-                    <span>{formatDeadline(details.deadline)}</span>
-                    <span>{details.tiers.reduce((sum, tier) => sum + tier.backers, 0)} backers</span>
-                  </div>
-
-                  <Link
-                    href={`/campaign/${campaign.campaignAddress}`}
-                    className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium"
-                  >
-                    View Campaign
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Stats Section */}
-      <div className="bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Platform Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div>
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {campaigns.length}
-            </div>
-            <div className="text-gray-600">Total Campaigns</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-green-600 mb-2">
-              {Object.values(campaignDetails).reduce((sum, details) => sum + parseFloat(details.balance || '0'), 0).toFixed(2)}
-            </div>
-            <div className="text-gray-600">ETH Raised</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-purple-600 mb-2">
-              {Object.values(campaignDetails).reduce((sum, details) =>
-                sum + details.tiers.reduce((tierSum, tier) => tierSum + tier.backers, 0), 0
-              )}
-            </div>
-            <div className="text-gray-600">Total Backers</div>
-          </div>
         </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-6 py-16">
+        {/* Featured Campaigns */}
+        <section className="mb-20">
+          <div className="flex items-center justify-between mb-12">
+            <h2 className="text-3xl font-light text-slate-900">Featured</h2>
+            <Link 
+              href="/campaigns" 
+              className="text-slate-600 hover:text-slate-900 font-medium flex items-center gap-2 group"
+            >
+              View all
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl p-8 animate-pulse">
+                  <div className="h-5 bg-slate-200 rounded-full mb-6 w-3/4"></div>
+                  <div className="h-4 bg-slate-200 rounded-full mb-3 w-full"></div>
+                  <div className="h-4 bg-slate-200 rounded-full mb-6 w-2/3"></div>
+                  <div className="h-3 bg-slate-200 rounded-full mb-8 w-1/2"></div>
+                  <div className="h-12 bg-slate-200 rounded-full"></div>
+                </div>
+              ))}
+            </div>
+          ) : campaigns.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-slate-400 text-2xl">+</span>
+              </div>
+              <h3 className="text-xl font-medium text-slate-900 mb-3">No campaigns yet</h3>
+              <p className="text-slate-600 mb-8">Be the first to create a campaign on our platform</p>
+              <Link
+                href="/create"
+                className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-full font-medium transition-colors"
+              >
+                Create Campaign
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {campaigns.slice(0, 6).map((campaign) => {
+                const details = campaignDetails[campaign.campaignAddress];
+                if (!details) return null;
+
+                const progress = (parseFloat(details.balance) / parseFloat(details.goal)) * 100;
+
+                return (
+                  <div key={campaign.campaignAddress} className="group bg-white rounded-2xl p-8 hover:shadow-xl transition-all duration-300 border border-slate-100">
+                    <div className="flex justify-between items-start mb-6">
+                      <h3 className="text-xl font-medium text-slate-900 leading-tight">
+                        {details.name}
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStateBadgeColor(details.state)}`}>
+                        {getStateText(details.state)}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-600 text-sm mb-8 line-clamp-3 leading-relaxed">
+                      {details.description}
+                    </p>
+
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium text-slate-900">
+                          {details.balance} ETH
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          of {details.goal} ETH
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-slate-900 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(progress, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-slate-500 mb-8">
+                      <span>{formatDeadline(details.deadline)}</span>
+                      <span>{details.tiers.reduce((sum, tier) => sum + tier.backers, 0)} backers</span>
+                    </div>
+
+                    <Link
+                      href={`/campaign/${campaign.campaignAddress}`}
+                      className="block w-full text-center bg-slate-50 hover:bg-slate-100 text-slate-900 py-3 rounded-xl font-medium transition-colors group-hover:bg-slate-900 group-hover:text-white"
+                    >
+                      View Project
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Stats Section */}
+        <section className="bg-white rounded-3xl p-12">
+          <h2 className="text-2xl font-light text-slate-900 mb-12 text-center">Platform Impact</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div className="text-center">
+              <div className="text-4xl font-light text-slate-900 mb-3">
+                {campaigns.length.toLocaleString()}
+              </div>
+              <div className="text-slate-600 font-medium">Projects Created</div>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-light text-slate-900 mb-3">
+                {Object.values(campaignDetails).reduce((sum, details) => sum + parseFloat(details.balance || '0'), 0).toFixed(1)}
+              </div>
+              <div className="text-slate-600 font-medium">ETH Raised</div>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-light text-slate-900 mb-3">
+                {Object.values(campaignDetails).reduce((sum, details) =>
+                  sum + details.tiers.reduce((tierSum, tier) => tierSum + tier.backers, 0), 0
+                ).toLocaleString()}
+              </div>
+              <div className="text-slate-600 font-medium">People Backed</div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

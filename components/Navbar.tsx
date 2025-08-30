@@ -6,8 +6,8 @@ export default function Navbar() {
   const { account, isConnecting, connectWallet, isConnected } = useWeb3();
 
   return (
-    <nav className="bg-white border-b border-gray-200 font-poppins">
-      <div className="container mx-auto px-8 py-3 ">
+    <nav className=" border-b border-gray-200 font-space-grotesk absolute w-full bg-white">
+      <div className="container mx-auto px-8 py-3 w-[85vw] ">
         <div className="flex justify-between items-center">
           {/* Logo */}
           <Link href="/" className="text-2xl font-semibold text-black">
@@ -16,14 +16,14 @@ export default function Navbar() {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-12">
-            <Link 
-              href="/campaigns" 
+            <Link
+              href="/campaigns"
               className="text-gray-700 hover:text-black font-medium"
             >
               Campaigns
             </Link>
-            <Link 
-              href="/my-campaigns" 
+            <Link
+              href="/my-campaigns"
               className="text-gray-700 hover:text-black font-medium"
             >
               My Campaigns
@@ -40,7 +40,7 @@ export default function Navbar() {
                     {account?.slice(2, 4).toUpperCase()}
                   </span>
                 </div>
-                
+
                 {/* Account Info */}
                 <span className="text-sm font-mono text-gray-900">
                   {account?.slice(0, 6)}...{account?.slice(-4)}

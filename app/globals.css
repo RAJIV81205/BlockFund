@@ -8,7 +8,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-poppins : var(--font-poppins)
+  --font-poppins : var(--font-poppins);
+  --font-space-grotesk :var(--font-space-grotesk);
+  --font-urbanist : var(--font-urbanist);
 }
 
 @media (prefers-color-scheme: dark) {
