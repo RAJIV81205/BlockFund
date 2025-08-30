@@ -82,17 +82,17 @@ export default function CampaignPage() {
     try {
       setFunding(true);
       setError(null);
-      
+
       console.log('=== FUNDING ATTEMPT ===');
       console.log('Campaign:', campaign);
       console.log('Selected Tier Index:', selectedTier);
       console.log('Selected Tier:', campaign.tiers[selectedTier]);
       console.log('User Address:', account);
-      
+
       const tierAmount = campaign.tiers[selectedTier].amount;
       await web3Service.fundCampaignWithValidation(address, selectedTier, tierAmount);
       await loadCampaign(); // Refresh campaign data
-      
+
       // Success message
       setError(null);
       alert(`Successfully funded ${tierAmount} ETH to ${campaign.tiers[selectedTier].name}!`);
@@ -109,30 +109,30 @@ export default function CampaignPage() {
     console.log('Campaign Address:', address);
     console.log('User Address:', account);
     console.log('Campaign Details:', campaign);
-    
+
     if (campaign) {
       console.log('Campaign State:', campaign.state);
       console.log('Campaign Paused:', campaign.paused);
       console.log('Tiers Count:', campaign.tiers.length);
       console.log('Selected Tier Index:', selectedTier);
       console.log('Is Owner:', isOwner());
-      
+
       if (campaign.tiers.length > 0) {
         console.log('Available Tiers:', campaign.tiers);
         console.log('Selected Tier:', campaign.tiers[selectedTier]);
       }
     }
-    
+
     try {
       const contractExists = await web3Service.checkContractExists(address);
       console.log('Contract Exists:', contractExists);
-      
+
       const currentNetwork = await web3Service.getCurrentNetwork();
       console.log('Current Network Chain ID:', currentNetwork);
-      
+
       const factoryPaused = await web3Service.isFactoryPaused();
       console.log('Factory Paused:', factoryPaused);
-      
+
       // Switch to correct network if needed
       await web3Service.switchToCorrectNetwork();
     } catch (error) {
@@ -271,7 +271,7 @@ export default function CampaignPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4 font-space-grotesk">
         {/* Campaign Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{campaign.name}</h1>
@@ -295,13 +295,25 @@ export default function CampaignPage() {
 
           {/* Progress Bar */}
           <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
+            {/* Label & Percentage */}
+            <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
               <span>Progress</span>
-              <span>{getProgressPercentage().toFixed(1)}%</span>
+              <span className="text-blue-600 font-semibold">
+                {getProgressPercentage().toFixed(1)}%
+              </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
+
+            {/* Progress Container */}
+            <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner relative overflow-hidden">
+              {/* Progress Fill */}
               <div
-                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                className="h-4 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(getProgressPercentage(), 100)}%` }}
+              ></div>
+
+              {/* Moving Shine Effect */}
+              <div
+                className="absolute top-0 left-0 h-4 w-full rounded-full opacity-20 bg-gradient-to-r from-transparent via-white to-transparent animate-[shine_2s_linear_infinite]"
                 style={{ width: `${Math.min(getProgressPercentage(), 100)}%` }}
               ></div>
             </div>
@@ -310,28 +322,22 @@ export default function CampaignPage() {
           {/* Campaign Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
             <div>
-              <span className="font-medium">Owner:</span> {campaign.owner}
+              <span className="font-medium">Owner: <br /></span> {campaign.owner}
             </div>
             <div>
-              <span className="font-medium">Deadline:</span> {formatDeadline(campaign.deadline)}
+              <span className="font-medium">Contract: <br /></span> {address}
             </div>
             <div>
-              <span className="font-medium">Status:</span> {campaign.paused ? 'Paused' : 'Active'}
+              <span className="font-medium">Deadline: <br /></span> {formatDeadline(campaign.deadline)}
             </div>
+
             <div>
-              <span className="font-medium">Contract:</span> {address}
+              <span className="font-medium">Status: <br /></span> {campaign.paused ? 'Paused' : 'Active'}
             </div>
+
           </div>
-          
-          {/* Debug Button (remove in production) */}
-          <div className="mt-4">
-            <button
-              onClick={debugCampaign}
-              className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
-            >
-              Debug Campaign
-            </button>
-          </div>
+
+
         </div>
 
         {/* Funding Tiers */}
@@ -393,7 +399,7 @@ export default function CampaignPage() {
 
         {/* Add Tier Modal */}
         {showAddTier && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-space-grotesk">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">Add New Tier</h3>
               <div className="space-y-4">
@@ -405,7 +411,7 @@ export default function CampaignPage() {
                     type="text"
                     value={newTierName}
                     onChange={(e) => setNewTierName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
                     placeholder="e.g., Early Bird, Premium Supporter"
                   />
                 </div>
@@ -415,10 +421,11 @@ export default function CampaignPage() {
                   </label>
                   <input
                     type="number"
+                    min={0.001}
                     step="0.001"
                     value={newTierAmount}
                     onChange={(e) => setNewTierAmount(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
                     placeholder="0.1"
                   />
                 </div>
@@ -494,8 +501,8 @@ export default function CampaignPage() {
                       onClick={handleTogglePause}
                       disabled={pausing}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:bg-gray-400 ${campaign.paused
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-orange-600 text-white hover:bg-orange-700'
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-orange-600 text-white hover:bg-orange-700'
                         }`}
                     >
                       {pausing ? 'Processing...' : (campaign.paused ? 'Resume' : 'Pause')}
