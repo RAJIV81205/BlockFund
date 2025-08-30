@@ -9,14 +9,10 @@ interface Campaign {
 }
 
 interface UseRealTimeUpdatesProps {
-  enablePolling?: boolean;
-  pollingInterval?: number;
   enableEventListeners?: boolean;
 }
 
 export const useRealTimeUpdates = ({
-  enablePolling = true,
-  pollingInterval = 30000,
   enableEventListeners = true
 }: UseRealTimeUpdatesProps = {}) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -24,17 +20,37 @@ export const useRealTimeUpdates = ({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Load initial campaigns
-  const loadCampaigns = useCallback(async () => {
+  // Load initial campaigns with retry logic
+  const loadCampaigns = useCallback(async (retryCount = 0) => {
     try {
       setLoading(true);
       setError(null);
       const allCampaigns = await web3Service.getAllCampaigns();
-      setCampaigns(allCampaigns);
+      setCampaigns(allCampaigns || []); // Ensure we always have an array
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Error loading campaigns:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load campaigns');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load campaigns';
+      
+      // Provide more specific error handling
+      if (errorMessage.includes('could not decode result data') || errorMessage.includes('Unable to decode campaign data')) {
+        setError('Network or contract issue detected. Please ensure you are connected to Holesky Testnet and the contract is properly deployed.');
+      } else if (errorMessage.includes('Please switch to the correct network')) {
+        setError('Please switch to Holesky Testnet to view campaigns.');
+      } else if (errorMessage.includes('No contract found')) {
+        setError('Contract not found at the specified address. Please check if the contract is deployed.');
+      } else if (errorMessage.includes('circuit breaker') || errorMessage.includes('missing revert data')) {
+        setError('Network connection issues detected. Try switching to a different RPC endpoint or wait a few minutes before retrying.');
+      } else {
+        setError(errorMessage);
+      }
+      
+      // Retry logic for initial load (max 2 retries) - but not for network errors
+      if (retryCount < 2 && !errorMessage.includes('switch to the correct network') && !errorMessage.includes('No contract found')) {
+        console.log(`Retrying campaign load in ${(retryCount + 1) * 2} seconds...`);
+        setTimeout(() => loadCampaigns(retryCount + 1), (retryCount + 1) * 2000);
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -54,17 +70,7 @@ export const useRealTimeUpdates = ({
     });
   }, []);
 
-  // Handle campaign updates from polling
-  const handlePollingUpdate = useCallback((updatedCampaigns: Campaign[]) => {
-    setCampaigns(prev => {
-      // Only update if there are actual changes
-      if (updatedCampaigns.length !== prev.length) {
-        setLastUpdate(new Date());
-        return updatedCampaigns;
-      }
-      return prev;
-    });
-  }, []);
+
 
   // Handle campaign funding events
   const handleCampaignFunded = useCallback((fundingData: {
@@ -116,11 +122,6 @@ export const useRealTimeUpdates = ({
       web3Service.listenForCampaignCreated(handleNewCampaign);
     }
 
-    // Set up polling
-    if (enablePolling) {
-      web3Service.startPollingForUpdates(handlePollingUpdate, pollingInterval);
-    }
-
     // Cleanup function
     return () => {
       web3Service.stopAllEventListeners();
@@ -128,10 +129,7 @@ export const useRealTimeUpdates = ({
   }, [
     loadCampaigns,
     handleNewCampaign,
-    handlePollingUpdate,
-    enableEventListeners,
-    enablePolling,
-    pollingInterval
+    enableEventListeners
   ]);
 
   return {

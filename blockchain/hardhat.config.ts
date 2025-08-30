@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
     holesky: {
       type: "http",
       chainType: "l1",
-      url: "https://17000.rpc.thirdweb.com",
+      url: "https://ethereum-holesky.publicnode.com",
       accounts: process.env.HOLESKY_PRIVATE_KEY
         ? [process.env.HOLESKY_PRIVATE_KEY]
         : [],

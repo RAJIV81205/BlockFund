@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useWeb3 } from "@/contexts/Web3Context";
+import NetworkStatus from "./NetworkStatus";
 
 
 export default function Navbar() {
@@ -29,6 +30,7 @@ export default function Navbar() {
             >
               My Campaigns
             </Link>
+            <NetworkStatus />
           </div>
 
           {/* Account/Connect Section */}

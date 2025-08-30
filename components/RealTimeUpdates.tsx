@@ -5,7 +5,7 @@ import { useWeb3 } from '@/contexts/Web3Context';
 
 interface Notification {
   id: string;
-  type: 'campaign_created' | 'campaign_funded' | 'campaign_state_changed';
+  type: 'campaign_created' | 'campaign_funded' | 'campaign_state_changed' | 'campaign_deleted' | 'campaign_updated' | 'deadline_extended' | 'tier_added' | 'tier_removed' | 'emergency_withdraw';
   message: string;
   timestamp: Date;
 }
@@ -53,6 +53,18 @@ export default function RealTimeUpdates() {
         return '💰';
       case 'campaign_state_changed':
         return '📊';
+      case 'campaign_deleted':
+        return '🗑️';
+      case 'campaign_updated':
+        return '✏️';
+      case 'deadline_extended':
+        return '⏰';
+      case 'tier_added':
+        return '➕';
+      case 'tier_removed':
+        return '➖';
+      case 'emergency_withdraw':
+        return '🚨';
       default:
         return '📢';
     }
@@ -66,6 +78,18 @@ export default function RealTimeUpdates() {
         return 'bg-blue-100 border-blue-400 text-blue-700';
       case 'campaign_state_changed':
         return 'bg-yellow-100 border-yellow-400 text-yellow-700';
+      case 'campaign_deleted':
+        return 'bg-red-100 border-red-400 text-red-700';
+      case 'campaign_updated':
+        return 'bg-purple-100 border-purple-400 text-purple-700';
+      case 'deadline_extended':
+        return 'bg-orange-100 border-orange-400 text-orange-700';
+      case 'tier_added':
+        return 'bg-teal-100 border-teal-400 text-teal-700';
+      case 'tier_removed':
+        return 'bg-pink-100 border-pink-400 text-pink-700';
+      case 'emergency_withdraw':
+        return 'bg-red-100 border-red-400 text-red-700';
       default:
         return 'bg-gray-100 border-gray-400 text-gray-700';
     }

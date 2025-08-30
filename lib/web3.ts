@@ -38,7 +38,8 @@ export class Web3Service {
   private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.JsonRpcSigner | null = null;
   private eventListeners: Map<string, { contract: ethers.Contract; listener: (...args: unknown[]) => void }> = new Map();
-  private pollingInterval: NodeJS.Timeout | null = null;
+  private factoryContract: ethers.Contract | null = null;
+  private campaignContracts: Map<string, ethers.Contract> = new Map();
 
   async connectWallet(): Promise<string | null> {
     if (!window.ethereum) {
@@ -163,6 +164,22 @@ export class Web3Service {
       console.log('Factory Address:', FACTORY_ADDRESS);
       console.log('Factory ABI:', FACTORY_ABI);
 
+      // Check if we're on the correct network first
+      const isCorrectNetwork = await this.isOnCorrectNetwork();
+      if (!isCorrectNetwork) {
+        console.log('Wrong network detected, attempting to switch...');
+        const switched = await this.switchToCorrectNetwork();
+        if (!switched) {
+          throw new Error('Please switch to the correct network (Holesky Testnet) to view campaigns');
+        }
+      }
+
+      // Check if contract exists at the address
+      const contractExists = await this.checkContractExists(FACTORY_ADDRESS);
+      if (!contractExists) {
+        throw new Error(`No contract found at address ${FACTORY_ADDRESS}. Please check if the contract is deployed.`);
+      }
+
       // For read-only operations, we can use a provider without signer
       let contract;
       if (this.signer) {
@@ -181,6 +198,12 @@ export class Web3Service {
       console.log('Raw campaigns result:', campaigns);
       console.log('Campaigns length:', campaigns.length);
 
+      // Handle empty campaigns array gracefully
+      if (!campaigns || campaigns.length === 0) {
+        console.log('No campaigns found - this is normal for a new deployment');
+        return [];
+      }
+
       return campaigns;
     } catch (error: unknown) {
       console.error('Error fetching campaigns:', error);
@@ -189,6 +212,11 @@ export class Web3Service {
           message: error.message,
           name: error.name
         });
+        
+        // Provide more helpful error messages
+        if (error.message.includes('could not decode result data')) {
+          throw new Error('Unable to decode campaign data. This might be due to network issues or the contract returning empty data. Please ensure you are connected to the correct network (Holesky Testnet).');
+        }
       }
       throw error;
     }
@@ -226,14 +254,14 @@ export class Web3Service {
       // Try to get tiers, fallback to empty array if function doesn't exist
       let tiers: Array<{ name: string; amount: string; backers: number }> = [];
       try {
-        const tiersResult = await campaign.fetTiers();
+        const tiersResult = await campaign.getTiers();
         tiers = tiersResult.map((tier: { name: string; amount: bigint; backers: bigint }) => ({
           name: tier.name,
           amount: ethers.formatEther(tier.amount),
           backers: Number(tier.backers)
         }));
       } catch {
-        console.log('fetTiers function not available, using empty tiers array');
+        console.log('getTiers function not available, using empty tiers array');
         tiers = [];
       }
 
@@ -719,15 +747,20 @@ export class Web3Service {
       console.log('Detected localhost deployment, switching to localhost network...');
       return await this.switchToLocalhost();
     }
-    // Holesky deployment (your previous address)
-    else if (factoryAddress === '0x0e88327fb445393a674194740535175c1cbf1c26') {
+    // Holesky deployment (current address)
+    else if (factoryAddress === '0xe68969f12595a6155d85e33f6ea900eca206b2d8') {
       console.log('Detected Holesky deployment, switching to Holesky network...');
       return await this.switchToHolesky();
     }
-    // Default to localhost for development
+    // Legacy Holesky deployment
+    else if (factoryAddress === '0x0e88327fb445393a674194740535175c1cbf1c26') {
+      console.log('Detected legacy Holesky deployment, switching to Holesky network...');
+      return await this.switchToHolesky();
+    }
+    // Default to Holesky for production
     else {
-      console.log('Unknown deployment, defaulting to localhost network...');
-      return await this.switchToLocalhost();
+      console.log('Unknown deployment, defaulting to Holesky network...');
+      return await this.switchToHolesky();
     }
   }
 
@@ -740,11 +773,13 @@ export class Web3Service {
       // Check if we're on the right network for the deployment
       if (factoryAddress === '0x5fbdb2315678afecb367f032d93f642f64180aa3') {
         return currentNetwork === 31337; // Localhost
-      } else if (factoryAddress === '0x0e88327fb445393a674194740535175c1cbf1c26') {
+      } else if (factoryAddress === '0xe68969f12595a6155d85e33f6ea900eca206b2d8' || 
+                 factoryAddress === '0x0e88327fb445393a674194740535175c1cbf1c26') {
         return currentNetwork === 17000; // Holesky
       }
 
-      return false;
+      // Default to Holesky for production
+      return currentNetwork === 17000;
     } catch (error) {
       console.error('Error checking network:', error);
       return false;
@@ -842,6 +877,123 @@ export class Web3Service {
     }
   }
 
+  // New campaign management methods
+  async deleteCampaign(campaignAddress: string) {
+    try {
+      const campaign = await this.getCrowdFundingContract(campaignAddress);
+      const userAddress = await this.getAccount();
+
+      if (!userAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Check if user is the owner
+      const campaignDetails = await this.getCampaignDetails(campaignAddress);
+      if (campaignDetails.owner.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error('Only campaign owner can delete the campaign');
+      }
+
+      const tx = await campaign.deleteCampaign();
+      return await tx.wait();
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      throw error;
+    }
+  }
+
+  async updateCampaignDetails(campaignAddress: string, newName: string, newDescription: string, newGoal: string) {
+    try {
+      const campaign = await this.getCrowdFundingContract(campaignAddress);
+      const userAddress = await this.getAccount();
+
+      if (!userAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Check if user is the owner
+      const campaignDetails = await this.getCampaignDetails(campaignAddress);
+      if (campaignDetails.owner.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error('Only campaign owner can update campaign details');
+      }
+
+      if (campaignDetails.state !== 0) {
+        throw new Error('Cannot update details of inactive campaigns');
+      }
+
+      const goalWei = ethers.parseEther(newGoal);
+      const tx = await campaign.updateCampaignDetails(newName, newDescription, goalWei);
+      return await tx.wait();
+    } catch (error) {
+      console.error('Error updating campaign details:', error);
+      throw error;
+    }
+  }
+
+  async emergencyWithdraw(campaignAddress: string) {
+    try {
+      const campaign = await this.getCrowdFundingContract(campaignAddress);
+      const userAddress = await this.getAccount();
+
+      if (!userAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Check if user is the owner
+      const campaignDetails = await this.getCampaignDetails(campaignAddress);
+      if (campaignDetails.owner.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error('Only campaign owner can perform emergency withdrawal');
+      }
+
+      const tx = await campaign.emergencyWithdraw();
+      return await tx.wait();
+    } catch (error) {
+      console.error('Error performing emergency withdrawal:', error);
+      throw error;
+    }
+  }
+
+  async isCampaignDeleted(campaignAddress: string): Promise<boolean> {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      return await campaign.deleted();
+    } catch (error) {
+      console.error('Error checking if campaign is deleted:', error);
+      return false;
+    }
+  }
+
+  async deleteCampaignFromFactory(campaignAddress: string) {
+    try {
+      const factory = await this.getFactoryContract();
+      const userAddress = await this.getAccount();
+
+      if (!userAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Check if user is the campaign owner
+      const campaignDetails = await this.getCampaignDetails(campaignAddress);
+      if (campaignDetails.owner.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error('Only campaign owner can delete the campaign from factory');
+      }
+
+      const tx = await factory.deleteCampaignFromFactory(campaignAddress);
+      return await tx.wait();
+    } catch (error) {
+      console.error('Error deleting campaign from factory:', error);
+      throw error;
+    }
+  }
+
   // Event listening methods for real-time updates
   async listenForCampaignCreated(callback: (campaignData: {
     campaignAddress: string;
@@ -850,6 +1002,12 @@ export class Web3Service {
     creationTime: number;
   }) => void) {
     try {
+      // Check if we're on the correct network first
+      const isCorrectNetwork = await this.isOnCorrectNetwork();
+      if (!isCorrectNetwork) {
+        console.warn('Not on correct network, event listening may not work properly');
+      }
+
       let factory;
       if (this.signer) {
         factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, this.signer);
@@ -861,6 +1019,13 @@ export class Web3Service {
       }
 
       const listener = (campaignAddress: string, owner: string, name: string, timestamp: bigint) => {
+        console.log('CampaignCreated event received:', {
+          campaignAddress,
+          owner,
+          name,
+          creationTime: Number(timestamp)
+        });
+        
         callback({
           campaignAddress,
           owner,
@@ -946,47 +1111,282 @@ export class Web3Service {
     }
   }
 
-  // Polling method for campaigns that don't have events
-  startPollingForUpdates(callback: (campaigns: Campaign[]) => void, intervalMs: number = 30000) {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-    }
-
-    this.pollingInterval = setInterval(async () => {
-      try {
-        const campaigns = await this.getAllCampaigns();
-        callback(campaigns);
-      } catch (error) {
-        console.error('Error polling for campaign updates:', error);
+  // New event listeners for the updated contract events
+  async listenForCampaignDeleted(campaignAddress: string, callback: (deletionData: {
+    deletedBy: string;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
       }
-    }, intervalMs);
 
-    console.log(`Started polling for campaign updates every ${intervalMs}ms`);
-  }
+      const listener = (deletedBy: string) => {
+        callback({
+          deletedBy,
+          campaignAddress
+        });
+      };
 
-  stopPollingForUpdates() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-      console.log('Stopped polling for campaign updates');
+      campaign.on("CampaignDeleted", listener);
+      this.eventListeners.set(`CampaignDeleted_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for CampaignDeleted events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up CampaignDeleted listener:', error);
     }
   }
 
-  // Stop all event listeners
-  stopAllEventListeners() {
+  async listenForCampaignDetailsUpdated(campaignAddress: string, callback: (updateData: {
+    newName: string;
+    newDescription: string;
+    newGoal: string;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (newName: string, newDescription: string, newGoal: bigint) => {
+        callback({
+          newName,
+          newDescription,
+          newGoal: ethers.formatEther(newGoal),
+          campaignAddress
+        });
+      };
+
+      campaign.on("CampaignDetailsUpdated", listener);
+      this.eventListeners.set(`CampaignDetailsUpdated_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for CampaignDetailsUpdated events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up CampaignDetailsUpdated listener:', error);
+    }
+  }
+
+  async listenForDeadlineExtended(campaignAddress: string, callback: (extensionData: {
+    newDeadline: number;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (newDeadline: bigint) => {
+        callback({
+          newDeadline: Number(newDeadline),
+          campaignAddress
+        });
+      };
+
+      campaign.on("DeadlineExtended", listener);
+      this.eventListeners.set(`DeadlineExtended_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for DeadlineExtended events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up DeadlineExtended listener:', error);
+    }
+  }
+
+  async listenForTierAdded(campaignAddress: string, callback: (tierData: {
+    name: string;
+    amount: string;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (name: string, amount: bigint) => {
+        callback({
+          name,
+          amount: ethers.formatEther(amount),
+          campaignAddress
+        });
+      };
+
+      campaign.on("TierAdded", listener);
+      this.eventListeners.set(`TierAdded_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for TierAdded events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up TierAdded listener:', error);
+    }
+  }
+
+  async listenForTierRemoved(campaignAddress: string, callback: (tierData: {
+    tierIndex: number;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (tierIndex: bigint) => {
+        callback({
+          tierIndex: Number(tierIndex),
+          campaignAddress
+        });
+      };
+
+      campaign.on("TierRemoved", listener);
+      this.eventListeners.set(`TierRemoved_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for TierRemoved events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up TierRemoved listener:', error);
+    }
+  }
+
+  async listenForEmergencyWithdraw(campaignAddress: string, callback: (withdrawData: {
+    owner: string;
+    amount: string;
+    campaignAddress: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (owner: string, amount: bigint) => {
+        callback({
+          owner,
+          amount: ethers.formatEther(amount),
+          campaignAddress
+        });
+      };
+
+      campaign.on("EmergencyWithdraw", listener);
+      this.eventListeners.set(`EmergencyWithdraw_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for EmergencyWithdraw events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up EmergencyWithdraw listener:', error);
+    }
+  }
+
+  // Event listening methods for real-time updates
+  // Remove specific event listener
+  removeEventListener(eventKey: string) {
+    const listenerData = this.eventListeners.get(eventKey);
+    if (listenerData) {
+      try {
+        const eventName = eventKey.split('_')[0];
+        listenerData.contract.removeListener(eventName, listenerData.listener);
+        this.eventListeners.delete(eventKey);
+        console.log(`Removed event listener: ${eventKey}`);
+      } catch (error) {
+        console.error(`Error removing listener ${eventKey}:`, error);
+      }
+    }
+  }
+
+  // Remove all event listeners for a specific campaign
+  removeCampaignEventListeners(campaignAddress: string) {
+    const keysToRemove = Array.from(this.eventListeners.keys()).filter(key => 
+      key.includes(campaignAddress)
+    );
+    keysToRemove.forEach(key => this.removeEventListener(key));
+  }
+
+  // Remove all event listeners
+  removeAllEventListeners() {
     this.eventListeners.forEach((listenerData, key) => {
       try {
-        listenerData.contract.removeListener(key.split('_')[0], listenerData.listener);
+        const eventName = key.split('_')[0];
+        listenerData.contract.removeListener(eventName, listenerData.listener);
       } catch (error) {
         console.error(`Error removing listener ${key}:`, error);
       }
     });
     this.eventListeners.clear();
-    this.stopPollingForUpdates();
-    console.log('Stopped all event listeners');
+    console.log('Removed all event listeners');
   }
 
-  // Method to refresh campaign data when events are received
+  // Get historical events
+  async getHistoricalEvents(campaignAddress: string, eventName: string, fromBlock: number = 0) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const filter = campaign.filters[eventName]();
+      const events = await campaign.queryFilter(filter, fromBlock);
+      return events;
+    } catch (error) {
+      console.error(`Error getting historical events for ${eventName}:`, error);
+      return [];
+    }
+  }
+
+  // Utility method to check if event listeners are active
+  hasActiveListeners(): boolean {
+    return this.eventListeners.size > 0;
+  }
+
+  // Get active listeners count
+  getActiveListenersCount(): number {
+    return this.eventListeners.size;
+  }
+
+  // --- Rest of your existing methods remain the same ---
+
+
+
+  // Removed polling methods - these will now throw errors
+  stopAllEventListeners() {
+    console.warn('stopAllEventListeners is deprecated. Use removeAllEventListeners instead.');
+    this.removeAllEventListeners();
+  }
+
+  // Updated cleanup method
   async refreshCampaignData(campaignAddress: string) {
     try {
       return await this.getCampaignDetails(campaignAddress);
@@ -996,12 +1396,10 @@ export class Web3Service {
     }
   }
 
-  // Method to check for new campaigns periodically
   async checkForNewCampaigns(lastKnownCount: number): Promise<Campaign[]> {
     try {
       const allCampaigns = await this.getAllCampaigns();
       if (allCampaigns.length > lastKnownCount) {
-        // Return only the new campaigns
         return allCampaigns.slice(lastKnownCount);
       }
       return [];
