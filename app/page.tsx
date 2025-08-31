@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { web3Service } from "@/lib/web3";
 import { CampaignState } from "@/lib/contracts";
 import ContractDebug from "@/components/ContractDebug";
-import NotificationTest from "@/components/NotificationTest";
 
 interface Campaign {
   campaignAddress: string;
@@ -216,7 +215,7 @@ export default function HomePage() {
         {/* Debug Section - Remove in production */}
         <section className="mb-8">
           <ContractDebug />
-          <NotificationTest />
+         
         </section>
 
         {/* Featured Campaigns */}

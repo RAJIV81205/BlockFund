@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { web3Service } from '@/lib/web3';
-import toast from 'react-hot-toast';
+import { notificationManager } from '@/lib/notificationManager';
 
 interface Campaign {
   campaignAddress: string;
@@ -21,51 +21,52 @@ export const useRealTimeUpdates = ({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Load initial campaigns with retry logic
+  // Track listeners to prevent duplicates
+  const [listenersSetup, setListenersSetup] = useState<Set<string>>(new Set());
+  const [factoryListenerSetup, setFactoryListenerSetup] = useState(false);
+
+  // ---------------------------
+  // Load campaigns
+  // ---------------------------
   const loadCampaigns = useCallback(async (retryCount = 0) => {
     try {
       setLoading(true);
       setError(null);
       const allCampaigns = await web3Service.getAllCampaigns();
-      setCampaigns(allCampaigns || []); // Ensure we always have an array
+      setCampaigns(allCampaigns || []);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Error loading campaigns:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load campaigns';
-      
-      // Provide more specific error handling
-      if (errorMessage.includes('could not decode result data') || errorMessage.includes('Unable to decode campaign data')) {
-        setError('Network or contract issue detected. Please ensure you are connected to Holesky Testnet and the contract is properly deployed.');
-      } else if (errorMessage.includes('Please switch to the correct network')) {
+
+      if (errorMessage.includes('decode')) {
+        setError('Network or contract issue detected. Check Holesky Testnet and deployment.');
+      } else if (errorMessage.includes('switch to the correct network')) {
         setError('Please switch to Holesky Testnet to view campaigns.');
       } else if (errorMessage.includes('No contract found')) {
-        setError('Contract not found at the specified address. Please check if the contract is deployed.');
-      } else if (errorMessage.includes('circuit breaker') || errorMessage.includes('missing revert data')) {
-        setError('Network connection issues detected. Try switching to a different RPC endpoint or wait a few minutes before retrying.');
+        setError('Contract not found at the specified address.');
       } else {
         setError(errorMessage);
       }
-      
-      // Retry logic for initial load (max 2 retries) - but not for network errors
-      if (retryCount < 2 && !errorMessage.includes('switch to the correct network') && !errorMessage.includes('No contract found')) {
+
+      // Retry max 2 times
+      if (retryCount < 2) {
         console.log(`Retrying campaign load in ${(retryCount + 1) * 2} seconds...`);
         setTimeout(() => loadCampaigns(retryCount + 1), (retryCount + 1) * 2000);
-        return;
       }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Handle new campaign created
+  // ---------------------------
+  // Event Handlers
+  // ---------------------------
   const handleNewCampaign = useCallback((campaignData: Campaign) => {
     console.log('New campaign created:', campaignData);
-    toast.success(`🚀 New campaign created: ${campaignData.name}`, {
-      duration: 5000,
-      position: 'top-right',
-    });
+    notificationManager.showNotification('campaign_created', campaignData);
+
     setCampaigns(prev => {
-      // Check if campaign already exists to avoid duplicates
       const exists = prev.some(c => c.campaignAddress === campaignData.campaignAddress);
       if (!exists) {
         setLastUpdate(new Date());
@@ -75,253 +76,100 @@ export const useRealTimeUpdates = ({
     });
   }, []);
 
-  // Handle campaign funding events
-  const handleCampaignFunded = useCallback((fundingData: {
-    backer: string;
-    amount: string;
-    tierIndex: number;
-  }, campaignAddress: string) => {
-    console.log('Campaign funded:', fundingData);
-    toast.success(`💰 Campaign funded with ${fundingData.amount} ETH!`, {
-      duration: 5000,
-      position: 'top-right',
-    });
+  const handleGenericEvent = useCallback((type: string, data: any, campaignAddress: string) => {
+    console.log(`${type} event:`, data);
+    notificationManager.showNotification(type, data, campaignAddress);
     setLastUpdate(new Date());
   }, []);
 
-  // Handle campaign state changes
-  const handleCampaignStateChange = useCallback((stateData: {
-    newState: number;
-  }, campaignAddress: string) => {
-    console.log('Campaign state changed:', stateData);
-    const stateNames = ['Active', 'Successful', 'Failed'];
-    const stateName = stateNames[stateData.newState] || 'Unknown';
-    
-    if (stateData.newState === 1) {
-      toast.success(`🎉 Campaign reached its goal and is now Successful!`, {
-        duration: 6000,
-        position: 'top-right',
-      });
-    } else if (stateData.newState === 2) {
-      toast.error(`😞 Campaign has Failed`, {
-        duration: 5000,
-        position: 'top-right',
-      });
+  // ---------------------------
+  // Listeners Setup
+  // ---------------------------
+  useEffect(() => {
+    if (!enableEventListeners) return;
+
+    // Attach factory listener ONCE
+    if (!factoryListenerSetup) {
+      console.log('Setting up factory event listener');
+      web3Service.listenForCampaignCreated(handleNewCampaign);
+      setFactoryListenerSetup(true);
     }
-    setLastUpdate(new Date());
-  }, []);
 
-  // Handle tier added
-  const handleTierAdded = useCallback((tierData: {
-    name: string;
-    amount: string;
-  }, campaignAddress: string) => {
-    console.log('Tier added:', tierData);
-    toast.success(`➕ New tier added: ${tierData.name} (${tierData.amount} ETH)`, {
-      duration: 4000,
-      position: 'top-right',
+    // Attach listeners only for new campaigns
+    campaigns.forEach(campaign => {
+      if (!listenersSetup.has(campaign.campaignAddress)) {
+        console.log(`Setting up listeners for campaign: ${campaign.campaignAddress}`);
+
+        web3Service.listenForCampaignEvents(campaign.campaignAddress, {
+          onFundReceived: (data) => handleGenericEvent('campaign_funded', data, campaign.campaignAddress),
+          onStateChanged: (data) => handleGenericEvent('campaign_state_changed', data, campaign.campaignAddress),
+          onTierAdded: (data) => handleGenericEvent('tier_added', data, campaign.campaignAddress),
+          onTierRemoved: (data) => handleGenericEvent('tier_removed', data, campaign.campaignAddress),
+          onWithdraw: (data) => handleGenericEvent('funds_withdrawn', data, campaign.campaignAddress),
+          onRefund: (data) => handleGenericEvent('refund_issued', data, campaign.campaignAddress),
+          onPaused: (data) => handleGenericEvent('campaign_paused', data, campaign.campaignAddress),
+          onDeadlineExtended: (data) => handleGenericEvent('deadline_extended', data, campaign.campaignAddress),
+          onDetailsUpdated: (data) => handleGenericEvent('details_updated', data, campaign.campaignAddress),
+          onDeleted: (data) => handleGenericEvent('campaign_deleted', data, campaign.campaignAddress),
+          onEmergencyWithdraw: (data) => handleGenericEvent('emergency_withdraw', data, campaign.campaignAddress),
+        });
+
+        setListenersSetup(prev => {
+          const updated = new Set(prev);
+          updated.add(campaign.campaignAddress);
+          return updated;
+        });
+      }
     });
-    setLastUpdate(new Date());
-  }, []);
+  }, [enableEventListeners, campaigns, handleNewCampaign, handleGenericEvent, factoryListenerSetup, listenersSetup]);
 
-  // Handle tier removed
-  const handleTierRemoved = useCallback((tierData: {
-    index: number;
-  }, campaignAddress: string) => {
-    console.log('Tier removed:', tierData);
-    toast(`➖ Tier removed from campaign`, {
-      duration: 4000,
-      position: 'top-right',
-      icon: '➖',
-    });
-    setLastUpdate(new Date());
-  }, []);
+  // ---------------------------
+  // Initial load + cleanup
+  // ---------------------------
+  useEffect(() => {
+    loadCampaigns();
 
-  // Handle funds withdrawn
-  const handleFundsWithdrawn = useCallback((withdrawData: {
-    owner: string;
-    amount: string;
-  }, campaignAddress: string) => {
-    console.log('Funds withdrawn:', withdrawData);
-    toast.success(`💸 Campaign owner withdrew ${withdrawData.amount} ETH`, {
-      duration: 5000,
-      position: 'top-right',
-    });
-    setLastUpdate(new Date());
-  }, []);
+    return () => {
+      console.log('Cleaning up all event listeners');
+      web3Service.removeAllEventListeners();
+      setListenersSetup(new Set());
+      setFactoryListenerSetup(false);
+    };
+  }, [loadCampaigns]);
 
-  // Handle refund issued
-  const handleRefundIssued = useCallback((refundData: {
-    backer: string;
-    amount: string;
-  }, campaignAddress: string) => {
-    console.log('Refund issued:', refundData);
-    toast(`💰 Refund issued: ${refundData.amount} ETH`, {
-      duration: 5000,
-      position: 'top-right',
-      icon: '💰',
-    });
-    setLastUpdate(new Date());
-  }, []);
-
-  // Handle campaign paused/unpaused
-  const handleCampaignPaused = useCallback((pauseData: {
-    paused: boolean;
-  }, campaignAddress: string) => {
-    console.log('Campaign pause status changed:', pauseData);
-    if (pauseData.paused) {
-      toast(`⏸️ Campaign has been paused`, {
-        duration: 4000,
-        position: 'top-right',
-        icon: '⏸️',
-        style: {
-          background: '#fef3c7',
-          color: '#92400e',
-          border: '1px solid #f59e0b',
-        },
-      });
-    } else {
-      toast.success(`▶️ Campaign has been resumed`, {
-        duration: 4000,
-        position: 'top-right',
-      });
-    }
-    setLastUpdate(new Date());
-  }, []);
-
-  // Handle deadline extended
-  const handleDeadlineExtended = useCallback((deadlineData: {
-    newDeadline: number;
-  }, campaignAddress: string) => {
-    console.log('Deadline extended:', deadlineData);
-    const newDate = new Date(deadlineData.newDeadline * 1000);
-    toast(`⏰ Campaign deadline extended to ${newDate.toLocaleDateString()}`, {
-      duration: 5000,
-      position: 'top-right',
-      icon: '⏰',
-    });
-    setLastUpdate(new Date());
-  }, []);
-
-  // Handle campaign details updated
-  const handleDetailsUpdated = useCallback((detailsData: {
-    name: string;
-    description: string;
-    goal: string;
-  }, campaignAddress: string) => {
-    console.log('Campaign details updated:', detailsData);
-    toast(`✏️ Campaign details updated: ${detailsData.name}`, {
-      duration: 4000,
-      position: 'top-right',
-      icon: '✏️',
-    });
-    setLastUpdate(new Date());
-  }, []);
-
-  // Handle campaign deleted
-  const handleCampaignDeleted = useCallback((deleteData: {
-    by: string;
-  }, campaignAddress: string) => {
-    console.log('Campaign deleted:', deleteData);
-    toast.error(`🗑️ Campaign has been deleted`, {
-      duration: 5000,
-      position: 'top-right',
-    });
-    setLastUpdate(new Date());
-  }, []);
-
-  // Handle emergency withdraw
-  const handleEmergencyWithdraw = useCallback((emergencyData: {
-    owner: string;
-    amount: string;
-  }, campaignAddress: string) => {
-    console.log('Emergency withdraw:', emergencyData);
-    toast.error(`🚨 Emergency withdrawal: ${emergencyData.amount} ETH`, {
-      duration: 6000,
-      position: 'top-right',
-    });
-    setLastUpdate(new Date());
-  }, []);
-
-  // Refresh specific campaign data
+  // ---------------------------
+  // Utility methods
+  // ---------------------------
   const refreshCampaign = useCallback(async (campaignAddress: string) => {
     try {
-      const updatedCampaign = await web3Service.refreshCampaignData(campaignAddress);
-      if (updatedCampaign) {
-        setLastUpdate(new Date());
-        // Update the specific campaign in the list if needed
-      }
+      const updated = await web3Service.refreshCampaignData(campaignAddress);
+      if (updated) setLastUpdate(new Date());
     } catch (err) {
       console.error('Error refreshing campaign:', err);
     }
   }, []);
 
-  // Manual refresh function
   const refresh = useCallback(() => {
     loadCampaigns();
   }, [loadCampaigns]);
 
-  // Set up event listeners for all campaigns
-  const setupCampaignEventListeners = useCallback(async () => {
-    if (!enableEventListeners) return;
-
-    try {
-      // Listen for new campaigns
-      web3Service.listenForCampaignCreated(handleNewCampaign);
-
-      // Set up listeners for existing campaigns
-      for (const campaign of campaigns) {
-        await web3Service.listenForCampaignEvents(campaign.campaignAddress, {
-          onFundReceived: (data) => handleCampaignFunded(data, campaign.campaignAddress),
-          onStateChanged: (data) => handleCampaignStateChange(data, campaign.campaignAddress),
-          onTierAdded: (data) => handleTierAdded(data, campaign.campaignAddress),
-          onTierRemoved: (data) => handleTierRemoved(data, campaign.campaignAddress),
-          onWithdraw: (data) => handleFundsWithdrawn(data, campaign.campaignAddress),
-          onRefund: (data) => handleRefundIssued(data, campaign.campaignAddress),
-          onPaused: (data) => handleCampaignPaused(data, campaign.campaignAddress),
-          onDeadlineExtended: (data) => handleDeadlineExtended(data, campaign.campaignAddress),
-          onDetailsUpdated: (data) => handleDetailsUpdated(data, campaign.campaignAddress),
-          onDeleted: (data) => handleCampaignDeleted(data, campaign.campaignAddress),
-          onEmergencyWithdraw: (data) => handleEmergencyWithdraw(data, campaign.campaignAddress),
-        });
-      }
-    } catch (error) {
-      console.error('Error setting up campaign event listeners:', error);
-    }
-  }, [
-    enableEventListeners,
-    campaigns,
-    handleNewCampaign,
-    handleCampaignFunded,
-    handleCampaignStateChange,
-    handleTierAdded,
-    handleTierRemoved,
-    handleFundsWithdrawn,
-    handleRefundIssued,
-    handleCampaignPaused,
-    handleDeadlineExtended,
-    handleDetailsUpdated,
-    handleCampaignDeleted,
-    handleEmergencyWithdraw
-  ]);
-
-  useEffect(() => {
-    // Load initial data
-    loadCampaigns();
-  }, [loadCampaigns]);
-
-  useEffect(() => {
-    // Set up event listeners after campaigns are loaded
-    if (campaigns.length > 0) {
-      setupCampaignEventListeners();
-    }
-
-    // Cleanup function
-    return () => {
-      web3Service.stopAllEventListeners();
+  const getListenerStatus = useCallback(() => {
+    return {
+      activeListeners: web3Service.getActiveListenersCount(),
+      setupCampaigns: Array.from(listenersSetup),
+      factoryListenerSetup,
+      notificationStats: notificationManager.getStats()
     };
-  }, [campaigns, setupCampaignEventListeners]);
+  }, [listenersSetup, factoryListenerSetup]);
 
+  const clearNotificationHistory = useCallback(() => {
+    notificationManager.clearAll();
+    console.log('Cleared notification history');
+  }, []);
+
+  // ---------------------------
+  // Return Hook API
+  // ---------------------------
   return {
     campaigns,
     loading,
@@ -329,16 +177,7 @@ export const useRealTimeUpdates = ({
     lastUpdate,
     refresh,
     refreshCampaign,
-    handleCampaignFunded,
-    handleCampaignStateChange,
-    handleTierAdded,
-    handleTierRemoved,
-    handleFundsWithdrawn,
-    handleRefundIssued,
-    handleCampaignPaused,
-    handleDeadlineExtended,
-    handleDetailsUpdated,
-    handleCampaignDeleted,
-    handleEmergencyWithdraw
+    getListenerStatus,
+    clearNotificationHistory,
   };
 };
