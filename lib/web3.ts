@@ -1306,6 +1306,187 @@ export class Web3Service {
     }
   }
 
+  async listenForFundsWithdrawn(campaignAddress: string, callback: (withdrawData: {
+    owner: string;
+    amount: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (owner: string, amount: bigint) => {
+        callback({
+          owner,
+          amount: ethers.formatEther(amount)
+        });
+      };
+
+      campaign.on("FundsWithdrawn", listener);
+      this.eventListeners.set(`FundsWithdrawn_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for FundsWithdrawn events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up FundsWithdrawn listener:', error);
+    }
+  }
+
+  async listenForRefundIssued(campaignAddress: string, callback: (refundData: {
+    backer: string;
+    amount: string;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (backer: string, amount: bigint) => {
+        callback({
+          backer,
+          amount: ethers.formatEther(amount)
+        });
+      };
+
+      campaign.on("RefundIssued", listener);
+      this.eventListeners.set(`RefundIssued_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for RefundIssued events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up RefundIssued listener:', error);
+    }
+  }
+
+  async listenForCampaignPaused(campaignAddress: string, callback: (pauseData: {
+    paused: boolean;
+  }) => void) {
+    try {
+      let campaign;
+      if (this.signer) {
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, this.signer);
+      } else if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        campaign = new ethers.Contract(campaignAddress, CROWDFUNDING_ABI, provider);
+      } else {
+        throw new Error('No Ethereum provider available');
+      }
+
+      const listener = (paused: boolean) => {
+        callback({ paused });
+      };
+
+      campaign.on("CampaignPaused", listener);
+      this.eventListeners.set(`CampaignPaused_${campaignAddress}`, { contract: campaign, listener: listener as (...args: unknown[]) => void });
+      
+      console.log(`Started listening for CampaignPaused events on campaign ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up CampaignPaused listener:', error);
+    }
+  }
+
+  // Comprehensive event listener setup for a campaign
+  async listenForCampaignEvents(campaignAddress: string, callbacks: {
+    onFundReceived?: (data: { backer: string; amount: string; tierIndex: number }) => void;
+    onStateChanged?: (data: { newState: number }) => void;
+    onTierAdded?: (data: { name: string; amount: string }) => void;
+    onTierRemoved?: (data: { index: number }) => void;
+    onWithdraw?: (data: { owner: string; amount: string }) => void;
+    onRefund?: (data: { backer: string; amount: string }) => void;
+    onPaused?: (data: { paused: boolean }) => void;
+    onDeadlineExtended?: (data: { newDeadline: number }) => void;
+    onDetailsUpdated?: (data: { name: string; description: string; goal: string }) => void;
+    onDeleted?: (data: { by: string }) => void;
+    onEmergencyWithdraw?: (data: { owner: string; amount: string }) => void;
+  }) {
+    try {
+      // Set up individual event listeners using existing methods
+      if (callbacks.onFundReceived) {
+        await this.listenForCampaignFunded(campaignAddress, (data) => {
+          callbacks.onFundReceived!(data);
+        });
+      }
+
+      if (callbacks.onStateChanged) {
+        await this.listenForCampaignStateChange(campaignAddress, (data: { newState: number; campaignAddress: string }) => {
+          callbacks.onStateChanged!({ newState: data.newState });
+        });
+      }
+
+      if (callbacks.onTierAdded) {
+        await this.listenForTierAdded(campaignAddress, (data) => {
+          callbacks.onTierAdded!(data);
+        });
+      }
+
+      if (callbacks.onTierRemoved) {
+        await this.listenForTierRemoved(campaignAddress, (data: { tierIndex: number; campaignAddress: string }) => {
+          callbacks.onTierRemoved!({ index: data.tierIndex });
+        });
+      }
+
+      if (callbacks.onWithdraw) {
+        await this.listenForFundsWithdrawn(campaignAddress, (data: { owner: string; amount: string }) => {
+          callbacks.onWithdraw!(data);
+        });
+      }
+
+      if (callbacks.onRefund) {
+        await this.listenForRefundIssued(campaignAddress, (data: { backer: string; amount: string }) => {
+          callbacks.onRefund!(data);
+        });
+      }
+
+      if (callbacks.onPaused) {
+        await this.listenForCampaignPaused(campaignAddress, (data: { paused: boolean }) => {
+          callbacks.onPaused!(data);
+        });
+      }
+
+      if (callbacks.onDeadlineExtended) {
+        await this.listenForDeadlineExtended(campaignAddress, (data) => {
+          callbacks.onDeadlineExtended!(data);
+        });
+      }
+
+      if (callbacks.onDetailsUpdated) {
+        await this.listenForCampaignDetailsUpdated(campaignAddress, (data: { newName: string; newDescription: string; newGoal: string; campaignAddress: string }) => {
+          callbacks.onDetailsUpdated!({
+            name: data.newName,
+            description: data.newDescription,
+            goal: data.newGoal
+          });
+        });
+      }
+
+      if (callbacks.onDeleted) {
+        await this.listenForCampaignDeleted(campaignAddress, (data: { deletedBy: string; campaignAddress: string }) => {
+          callbacks.onDeleted!({ by: data.deletedBy });
+        });
+      }
+
+      if (callbacks.onEmergencyWithdraw) {
+        await this.listenForEmergencyWithdraw(campaignAddress, (data: { owner: string; amount: string; campaignAddress: string }) => {
+          callbacks.onEmergencyWithdraw!({ owner: data.owner, amount: data.amount });
+        });
+      }
+
+      console.log(`Set up comprehensive event listeners for campaign: ${campaignAddress}`);
+    } catch (error) {
+      console.error('Error setting up comprehensive campaign event listeners:', error);
+    }
+  }
+
   // Event listening methods for real-time updates
   // Remove specific event listener
   removeEventListener(eventKey: string) {

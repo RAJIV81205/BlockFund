@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { web3Service } from "@/lib/web3";
 import { CampaignState } from "@/lib/contracts";
 import ContractDebug from "@/components/ContractDebug";
+import NotificationTest from "@/components/NotificationTest";
 
 interface Campaign {
   campaignAddress: string;
@@ -44,7 +45,7 @@ export default function HomePage() {
     try {
       setError(null);
       setNetworkError(null);
-      
+
       // Check if we're on the correct network first
       const isCorrectNetwork = await web3Service.isOnCorrectNetwork();
       if (!isCorrectNetwork) {
@@ -70,7 +71,7 @@ export default function HomePage() {
     } catch (error) {
       console.error('Failed to load campaigns:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load campaigns';
-      
+
       if (errorMessage.includes('switch to the correct network') || errorMessage.includes('Holesky')) {
         setNetworkError(errorMessage);
       } else {
@@ -215,6 +216,7 @@ export default function HomePage() {
         {/* Debug Section - Remove in production */}
         <section className="mb-8">
           <ContractDebug />
+          <NotificationTest />
         </section>
 
         {/* Featured Campaigns */}
@@ -249,7 +251,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-lg font-medium text-slate-900 mb-2">No campaigns yet</h3>
               <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                {networkError 
+                {networkError
                   ? "Switch to Holesky Testnet to view and create campaigns"
                   : "Be the first to create a campaign and start raising funds for your project"
                 }
