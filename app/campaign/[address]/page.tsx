@@ -324,6 +324,8 @@ export default function CampaignPage() {
                 Add Tier
               </button>
             )}
+
+
           </div>
 
           {campaign.tiers.length === 0 ? (
@@ -366,6 +368,34 @@ export default function CampaignPage() {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Funding Section */}
+          {!isOwner() && campaign.state === 0 && !campaign.paused && campaign.tiers.length > 0 && (
+            !account ? (
+              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Connect Wallet to Fund</h2>
+                <button
+                  onClick={connectWallet}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Connect Wallet
+                </button>
+              </div>
+            ) : (
+
+
+              <div className="flex flex-col md:flex-row gap-4 justify-center items-center pt-5">
+                <button
+                  onClick={handleFund}
+                  disabled={funding || !campaign.tiers[selectedTier]}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {funding ? 'Funding...' : `Fund ${campaign.tiers[selectedTier]?.amount || '0'} ETH`}
+                </button>
+              </div>
+
+            )
           )}
         </div>
 
@@ -527,50 +557,7 @@ export default function CampaignPage() {
           </div>
         )}
 
-        {/* Funding Section */}
-        {!isOwner() && campaign.state === 0 && !campaign.paused && campaign.tiers.length > 0 && (
-          !account ? (
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Connect Wallet to Fund</h2>
-              <button
-                onClick={connectWallet}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Connect Wallet
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Fund This Campaign</h2>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selected Tier: {campaign.tiers[selectedTier]?.name}
-                  </label>
-                  <input
-                    type="number"
-                    value={campaign.tiers[selectedTier]?.amount || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
-                    placeholder="Select a tier above"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={handleFund}
-                    disabled={funding || !campaign.tiers[selectedTier]}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    {funding ? 'Funding...' : `Fund ${campaign.tiers[selectedTier]?.amount || '0'} ETH`}
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Click on a tier above to select it, then fund with the exact amount.
-              </p>
-            </div>
-          )
-        )}
+
 
         {/* Campaign Status Messages */}
         {!isOwner() && (
