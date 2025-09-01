@@ -105,7 +105,7 @@ contract CrowdFunding {
         payable(owner).transfer(balance);
     }
 
-    function refund() public notDeleted {
+    function refund() public  {
         checkAndUpdateCampaign();
         uint256 amount = backers[msg.sender].totalContribution;
         require(amount > 0, "No contributions");
@@ -132,7 +132,7 @@ contract CrowdFunding {
     }
 
     /// @notice Soft delete campaign (cannot be funded anymore)
-    function deleteCampaign() external onlyOwner notDeleted {
+    function deleteCampaign() external notDeleted {
         deleted = true;
         state = CampaignState.Failed; // mark failed to enable refunds
         emit CampaignDeleted(msg.sender);

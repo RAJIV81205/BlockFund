@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { web3Service } from "@/lib/web3";
 import { CampaignState } from "@/lib/contracts";
-import ContractDebug from "@/components/ContractDebug";
+
 
 interface Campaign {
   campaignAddress: string;
@@ -212,12 +212,7 @@ export default function HomePage() {
       </section>
 
       <div className="max-w-7xl mx-auto px-6 py-16">
-        {/* Debug Section - Remove in production */}
-        <section className="mb-8">
-          <ContractDebug />
-         
-        </section>
-
+       
         {/* Featured Campaigns */}
         <section className="mb-20">
           <div className="flex items-center justify-between mb-12">

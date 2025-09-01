@@ -38,17 +38,31 @@ export default function CampaignPage() {
   const [newTierAmount, setNewTierAmount] = useState('');
   const [addingTier, setAddingTier] = useState(false);
   const [removingTier, setRemovingTier] = useState<number | null>(null);
-  const [showOwnerActions, setShowOwnerActions] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [pausing, setPausing] = useState(false);
   const [extendDays, setExtendDays] = useState('');
   const [extending, setExtending] = useState(false);
 
+  // Edit campaign states
+  const [showEditCampaign, setShowEditCampaign] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editGoal, setEditGoal] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  // Extend deadline modal state
+  const [showExtendModal, setShowExtendModal] = useState(false);
+
   const loadCampaign = useCallback(async () => {
     try {
       setLoading(true);
+      
+
       const details = await web3Service.getCampaignDetails(address);
       setCampaign(details);
+      setEditName(details.name);
+      setEditDescription(details.description);
+      setEditGoal(details.goal);
     } catch (err) {
       setError('Failed to load campaign details');
       console.error(err);
@@ -60,8 +74,6 @@ export default function CampaignPage() {
   useEffect(() => {
     loadCampaign();
   }, [loadCampaign]);
-
-
 
   const handleFund = async () => {
     if (!campaign || !account) {
@@ -91,9 +103,8 @@ export default function CampaignPage() {
 
       const tierAmount = campaign.tiers[selectedTier].amount;
       await web3Service.fundCampaignWithValidation(address, selectedTier, tierAmount);
-      await loadCampaign(); // Refresh campaign data
+      await loadCampaign();
 
-      // Success message
       setError(null);
       alert(`Successfully funded ${tierAmount} ETH to ${campaign.name}!`);
     } catch (err: unknown) {
@@ -104,7 +115,6 @@ export default function CampaignPage() {
       setFunding(false);
     }
   };
-
 
   const formatDeadline = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString();
@@ -203,6 +213,7 @@ export default function CampaignPage() {
       await web3Service.extendDeadline(address, parseInt(extendDays));
       await loadCampaign();
       setExtendDays('');
+      setShowExtendModal(false);
       setError(null);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to extend deadline';
@@ -212,6 +223,58 @@ export default function CampaignPage() {
       setExtending(false);
     }
   };
+
+  const handleUpdateCampaign = async () => {
+    if (!editName.trim() || !editDescription.trim() || !editGoal || !campaign) return;
+
+    try {
+      setUpdating(true);
+      await web3Service.updateCampaignDetails(address, editName.trim(), editDescription.trim(), editGoal);
+      await loadCampaign();
+      setShowEditCampaign(false);
+      setError(null);
+      alert('Campaign details updated successfully!');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update campaign details';
+      setError(errorMessage);
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Delete campaign states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteCampaign = async () => {
+    try {
+      if (!isOwner()) {
+        setError("You are not the owner of this campaign");
+        return;
+      }
+
+      setDeleting(true);
+      setError(null);
+
+      console.log("Deleting campaign:", address);
+      await web3Service.deleteCampaign(address);
+      
+      // Show success message and redirect
+      alert('Campaign deleted successfully!');
+      
+      // Redirect to campaigns page after successful deletion
+      window.location.href = '/campaigns';
+      
+    } catch (error: unknown) {
+      console.error("Error deleting campaign:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete campaign';
+      setError(errorMessage);
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  }
 
   const handleRefund = async () => {
     try {
@@ -246,7 +309,51 @@ export default function CampaignPage() {
       <div className="max-w-4xl mx-auto px-4 font-space-grotesk">
         {/* Campaign Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{campaign.name}</h1>
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 truncate w-1/2">{campaign.name}</h1>
+            {isOwner() && campaign.state === 0 && (
+              <div className='flex flex-row gap-2 flex-wrap'>
+                <button
+                  onClick={() => setShowEditCampaign(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Edit 
+                </button>
+                <button 
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors text-sm"
+                >
+                  Delete 
+                </button>
+                <button
+                  onClick={handleTogglePause}
+                  disabled={pausing}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:bg-gray-400 ${campaign.paused
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-orange-600 text-white hover:bg-orange-700'
+                    }`}
+                >
+                  {pausing ? 'Processing...' : (campaign.paused ? 'Resume' : 'Pause')}
+                </button>
+                <button
+                  onClick={() => setShowExtendModal(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm"
+                >
+                  Extend
+                </button>
+              </div>
+            )}
+            {/* Withdraw button for successful campaigns */}
+            {isOwner() && campaign.state === 1 && parseFloat(campaign.balance) > 0 && (
+              <button
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors text-sm disabled:bg-gray-400"
+              >
+                {withdrawing ? 'Withdrawing...' : 'Withdraw Funds'}
+              </button>
+            )}
+          </div>
           <p className="text-gray-600 mb-6">{campaign.description}</p>
 
           {/* Campaign Stats */}
@@ -267,7 +374,6 @@ export default function CampaignPage() {
 
           {/* Progress Bar */}
           <div className="mb-6">
-            {/* Label & Percentage */}
             <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
               <span>Progress</span>
               <span className="text-blue-600 font-semibold">
@@ -275,15 +381,12 @@ export default function CampaignPage() {
               </span>
             </div>
 
-            {/* Progress Container */}
             <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner relative overflow-hidden">
-              {/* Progress Fill */}
               <div
                 className="h-4 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-500 ease-out"
                 style={{ width: `${Math.min(getProgressPercentage(), 100)}%` }}
               ></div>
 
-              {/* Moving Shine Effect */}
               <div
                 className="absolute top-0 left-0 h-4 w-full rounded-full opacity-20 bg-gradient-to-r from-transparent via-white to-transparent animate-[shine_2s_linear_infinite]"
                 style={{ width: `${Math.min(getProgressPercentage(), 100)}%` }}
@@ -302,14 +405,10 @@ export default function CampaignPage() {
             <div>
               <span className="font-medium">Deadline: <br /></span> {formatDeadline(campaign.deadline)}
             </div>
-
             <div>
               <span className="font-medium">Status: <br /></span> {campaign.paused ? 'Paused' : 'Active'}
             </div>
-
           </div>
-
-
         </div>
 
         {/* Funding Tiers */}
@@ -324,8 +423,6 @@ export default function CampaignPage() {
                 Add Tier
               </button>
             )}
-
-
           </div>
 
           {campaign.tiers.length === 0 ? (
@@ -383,8 +480,6 @@ export default function CampaignPage() {
                 </button>
               </div>
             ) : (
-
-
               <div className="flex flex-col md:flex-row gap-4 justify-center items-center pt-5">
                 <button
                   onClick={handleFund}
@@ -394,10 +489,121 @@ export default function CampaignPage() {
                   {funding ? 'Funding...' : `Fund ${campaign.tiers[selectedTier]?.amount || '0'} ETH`}
                 </button>
               </div>
-
             )
           )}
         </div>
+
+        {/* Extend Deadline Modal */}
+        {showExtendModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-space-grotesk">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Extend Campaign Deadline</h3>
+              <p className="text-gray-600 mb-4">Add more days to your campaign deadline</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Days
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={extendDays}
+                    onChange={(e) => setExtendDays(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
+                    placeholder="Enter number of days"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowExtendModal(false);
+                    setExtendDays('');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExtendDeadline}
+                  disabled={extending || !extendDays || parseInt(extendDays) <= 0}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {extending ? 'Extending...' : 'Extend Deadline'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Campaign Modal */}
+        {showEditCampaign && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-space-grotesk">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Edit Campaign Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Campaign Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
+                    placeholder="Enter campaign name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
+                    placeholder="Describe your campaign"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Funding Goal (ETH)
+                  </label>
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    value={editGoal}
+                    onChange={(e) => setEditGoal(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-950 focus:outline-transparent text-gray-900"
+                    placeholder="Enter funding goal"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditCampaign(false);
+                    setEditName(campaign?.name || '');
+                    setEditDescription(campaign?.description || '');
+                    setEditGoal(campaign?.goal || '');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateCampaign}
+                  disabled={updating || !editName.trim() || !editDescription.trim() || !editGoal}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {updating ? 'Updating...' : 'Update Campaign'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Tier Modal */}
         {showAddTier && (
@@ -455,92 +661,6 @@ export default function CampaignPage() {
           </div>
         )}
 
-        {/* Owner Actions */}
-        {isOwner() && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Campaign Management</h2>
-              <button
-                onClick={() => setShowOwnerActions(!showOwnerActions)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {showOwnerActions ? 'Hide Actions' : 'Show Actions'}
-              </button>
-            </div>
-
-            {showOwnerActions && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Withdraw Funds */}
-                {campaign.state === 1 && parseFloat(campaign.balance) > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-bold text-green-600 mb-2">Withdraw Funds</h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Campaign successful! Withdraw {campaign.balance} ETH
-                    </p>
-                    <button
-                      onClick={handleWithdraw}
-                      disabled={withdrawing}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:bg-gray-400"
-                    >
-                      {withdrawing ? 'Withdrawing...' : 'Withdraw Funds'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Pause/Unpause Campaign */}
-                {campaign.state === 0 && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-bold text-orange-600 mb-2">
-                      {campaign.paused ? 'Resume Campaign' : 'Pause Campaign'}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {campaign.paused
-                        ? 'Resume accepting contributions'
-                        : 'Temporarily stop accepting contributions'
-                      }
-                    </p>
-                    <button
-                      onClick={handleTogglePause}
-                      disabled={pausing}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:bg-gray-400 ${campaign.paused
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-orange-600 text-white hover:bg-orange-700'
-                        }`}
-                    >
-                      {pausing ? 'Processing...' : (campaign.paused ? 'Resume' : 'Pause')}
-                    </button>
-                  </div>
-                )}
-
-                {/* Extend Deadline */}
-                {campaign.state === 0 && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-bold text-blue-600 mb-2">Extend Deadline</h3>
-                    <p className="text-sm text-gray-600 mb-3">Add more days to the campaign</p>
-                    <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={extendDays}
-                        onChange={(e) => setExtendDays(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Days"
-                      />
-                      <button
-                        onClick={handleExtendDeadline}
-                        disabled={extending || !extendDays || parseInt(extendDays) <= 0}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400"
-                      >
-                        {extending ? 'Extending...' : 'Extend'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Refund Section for Failed Campaigns */}
         {campaign.state === 2 && account && !isOwner() && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
@@ -556,8 +676,6 @@ export default function CampaignPage() {
             </button>
           </div>
         )}
-
-
 
         {/* Campaign Status Messages */}
         {!isOwner() && (
@@ -596,6 +714,48 @@ export default function CampaignPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Delete Campaign Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-space-grotesk">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-xl font-bold text-red-900 mb-4">Delete Campaign</h3>
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Are you sure you want to delete this campaign? This action cannot be undone.
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-red-800 mb-2">⚠️ Warning:</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    <li>• The campaign will be marked as failed</li>
+                    <li>• Contributors will be able to claim refunds</li>
+                    <li>• The campaign will be removed from the platform</li>
+                    <li>• This action is permanent and irreversible</li>
+                    {campaign && parseFloat(campaign.balance) > 0 && (
+                      <li className="font-semibold">• Current balance ({campaign.balance} ETH) will be available for refunds</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={deleteCampaign}
+                  disabled={deleting}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Campaign'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Error Display */}

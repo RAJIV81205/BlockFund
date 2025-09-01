@@ -102,7 +102,6 @@ export function Web3Provider({ children }: Web3ProviderProps) {
       try {
         const bal = await web3Service.getBalance(account);
         setBalance(bal);
-        console.log("[Web3Context] Balance:", bal);
       } catch (err) {
         console.error("[Web3Context] Failed to fetch balance:", err);
         setBalance(null);
