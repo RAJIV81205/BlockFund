@@ -11,7 +11,7 @@ interface Data {
   index?: string | number;
   owner?: string;
   paused?: boolean;
-  newDeadline?:string | number | Date ;
+  newDeadline?: string | number | Date;
 }
 
 class NotificationManager {
@@ -52,11 +52,11 @@ class NotificationManager {
   private isDuplicate(eventId: string): boolean {
     const now = Date.now();
     const lastNotification = this.recentNotifications.get(eventId);
-    
+
     if (lastNotification && (now - lastNotification) < this.DUPLICATE_WINDOW) {
       return true;
     }
-    
+
     this.recentNotifications.set(eventId, now);
     return false;
   }
@@ -70,9 +70,18 @@ class NotificationManager {
     }
   }
 
+  private formatAddress(address?: string): string {
+    if (!address) return 'Unknown Contract';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
+  private createNotificationContent(contractAddress: string, message: string): string {
+    return `Contract: ${this.formatAddress(contractAddress)}\n${message}`;
+  }
+
   showNotification(type: string, data: Data, campaignAddress?: string) {
     const eventId = this.generateEventId(type, data, campaignAddress);
-    
+
     if (this.isDuplicate(eventId)) {
       console.log(`Duplicate notification blocked: ${eventId}`);
       return;
@@ -80,118 +89,68 @@ class NotificationManager {
 
     console.log(`Showing notification: ${eventId}`);
 
+    const address = campaignAddress || data.campaignAddress || 'Unknown';
+
     switch (type) {
       case 'campaign_created':
-        toast.success(`🚀 New campaign created: ${data.name}`, {
-          duration: 5000,
-          position: 'top-right',
-        });
+        toast.success(this.createNotificationContent(address, `New campaign created: ${data.name}`));
         break;
 
       case 'campaign_funded':
-        toast.success(`💰 Campaign funded with ${data.amount} ETH!`, {
-          duration: 5000,
-          position: 'top-right',
-        });
+        toast.success(this.createNotificationContent(address, `Campaign funded with ${data.amount} ETH!`));
         break;
 
       case 'campaign_state_changed':
         if (data.newState === 1) {
-          toast.success(`🎉 Campaign reached its goal and is now Successful!`, {
-            duration: 6000,
-            position: 'top-right',
-          });
+          toast.success(this.createNotificationContent(address, `Campaign reached its goal and is now Successful!`));
         } else if (data.newState === 2) {
-          toast.error(`😞 Campaign has Failed`, {
-            duration: 5000,
-            position: 'top-right',
-          });
+          toast.error(this.createNotificationContent(address, `Campaign has Failed`));
         }
         break;
 
       case 'tier_added':
-        toast.success(`➕ New tier added: ${data.name} (${data.amount} ETH)`, {
-          duration: 4000,
-          position: 'top-right',
-        });
+        toast.success(this.createNotificationContent(address, `New tier added: ${data.name} (${data.amount} ETH)`));
         break;
 
       case 'tier_removed':
-        toast(`➖ Tier removed from campaign`, {
-          duration: 4000,
-          position: 'top-right',
-          icon: '➖',
-        });
+        toast(this.createNotificationContent(address, `Tier removed from campaign`));
         break;
 
       case 'funds_withdrawn':
-        toast.success(`💸 Campaign owner withdrew ${data.amount} ETH`, {
-          duration: 5000,
-          position: 'top-right',
-        });
+        toast.success(this.createNotificationContent(address, `Campaign owner withdrew ${data.amount} ETH`));
         break;
 
       case 'refund_issued':
-        toast(`💰 Refund issued: ${data.amount} ETH`, {
-          duration: 5000,
-          position: 'top-right',
-          icon: '💰',
-        });
+        toast(this.createNotificationContent(address, `Refund issued: ${data.amount} ETH`));
         break;
 
       case 'campaign_paused':
         if (data.paused) {
-          toast(`⏸️ Campaign has been paused`, {
-            duration: 4000,
-            position: 'top-right',
-            icon: '⏸️',
-            style: {
-              background: '#fef3c7',
-              color: '#92400e',
-              border: '1px solid #f59e0b',
-            },
-          });
+          toast(this.createNotificationContent(address, `Campaign has been paused`));
         } else {
-          toast.success(`▶️ Campaign has been resumed`, {
-            duration: 4000,
-            position: 'top-right',
-          });
+          toast.success(this.createNotificationContent(address, `Campaign has been resumed`));
         }
         break;
 
       case 'deadline_extended':
         if (typeof data.newDeadline === 'number') {
           const newDate = new Date(data.newDeadline * 1000);
-          toast(`⏰ Campaign deadline extended to ${newDate.toLocaleDateString()}`, {
-            duration: 5000,
-            position: 'top-right',
-            icon: '⏰',
-          });
+          toast(this.createNotificationContent(address, `Campaign deadline extended to ${newDate.toLocaleDateString()}`));
         } else {
           console.warn('Invalid newDeadline received for deadline_extended notification:', data.newDeadline);
         }
         break;
 
       case 'details_updated':
-        toast(`✏️ Campaign details updated: ${data.name}`, {
-          duration: 4000,
-          position: 'top-right',
-          icon: '✏️',
-        });
+        toast(this.createNotificationContent(address, `Campaign details updated: ${data.name}`));
         break;
 
       case 'campaign_deleted':
-        toast.error(`🗑️ Campaign has been deleted`, {
-          duration: 5000,
-          position: 'top-right',
-        });
+        toast.error(this.createNotificationContent(address, `Campaign has been deleted`));
         break;
 
       case 'emergency_withdraw':
-        toast.error(`🚨 Emergency withdrawal: ${data.amount} ETH`, {
-          duration: 6000,
-          position: 'top-right',
-        });
+        toast.error(this.createNotificationContent(address, `Emergency withdrawal: ${data.amount} ETH`));
         break;
 
       default:
