@@ -306,7 +306,7 @@ export default function HomePage() {
 
                     <Link
                       href={`/campaign/${campaign.campaignAddress}`}
-                      className="block w-full text-center bg-slate-50 hover:bg-slate-100 text-slate-900 py-3 rounded-xl font-medium transition-colors group-hover:bg-slate-900 group-hover:text-white"
+                      className="block w-full text-center bg-slate-50  text-slate-900 py-3 rounded-xl font-medium transition-colors group-hover:bg-slate-900 group-hover:text-white border border-slate-400/30"
                     >
                       View Project
                     </Link>
